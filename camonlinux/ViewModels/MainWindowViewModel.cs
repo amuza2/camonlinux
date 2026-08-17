@@ -175,7 +175,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
         _micEnabled = settings.Settings.MicEnabled;
+        // Seed both combos with a valid default item so they always display a
+        // selection from the very first render (the item lists are otherwise
+        // empty until the async population completes after the window opens).
         Resolutions.Add("Default");
+        AudioDevices.Add("Default");
         _selectedResolution = string.IsNullOrEmpty(settings.Settings.Resolution) ? "Default" : settings.Settings.Resolution;
         _selectedQuality = MapQualityLabel(settings.Settings.RecordQuality);
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
@@ -425,8 +429,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var saved = _settings.Settings.Resolution;
         var target = Resolutions.Contains(saved) ? saved : "Default";
-        if (!string.Equals(SelectedResolution, target, StringComparison.Ordinal))
-            SelectedResolution = target;
+        SelectedResolution = target;
+        // The collection was just cleared and rebuilt, which drops the ComboBox's
+        // internal selection; re-assigning the same value may not raise a change
+        // notification, so force the ComboBox to re-sync with the current items.
+        OnPropertyChanged(nameof(SelectedResolution));
     }
 
     partial void OnSelectedDeviceChanged(CameraDevice? value)
@@ -1176,6 +1183,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var saved = _settings.Settings.AudioDevice;
         SelectedAudioDevice = string.IsNullOrEmpty(saved) ? "Default" : (AudioDevices.Contains(saved) ? saved : "Default");
+        // Force the ComboBox to re-sync after the collection rebuild (the setter
+        // may skip the notification when the value is unchanged).
+        OnPropertyChanged(nameof(SelectedAudioDevice));
     }
 
     partial void OnSelectedAudioDeviceChanged(string value)
