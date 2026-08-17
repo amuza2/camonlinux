@@ -1,0 +1,34 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using camonlinux.Models;
+
+namespace camonlinux.Capture;
+
+/// <summary>
+/// Abstraction over the camera capture backend. The current implementation is
+/// GStreamer-based (<see cref="GStreamerCaptureService"/>), but isolating the
+/// contract here keeps the UI/MVVM layer backend-agnostic.
+/// </summary>
+public interface ICaptureService : IAsyncDisposable
+{
+    /// <summary>Raised on the streaming thread whenever a new preview frame is available.</summary>
+    event EventHandler<CameraFrame>? FrameReady;
+
+    /// <summary>Raised when the capture backend encounters a recoverable error.</summary>
+    event EventHandler<string>? ErrorOccurred;
+
+    bool IsPreviewActive { get; }
+    bool IsRecording { get; }
+    bool Mirrored { get; set; }
+    CameraDevice? CurrentDevice { get; }
+    IReadOnlyList<CameraDevice> Devices { get; }
+
+    Task InitializeAsync();
+    Task<IReadOnlyList<CameraDevice>> RefreshDevicesAsync();
+    Task StartPreviewAsync(CameraDevice device);
+    Task StopPreviewAsync();
+    Task TakePhotoAsync(string path);
+    Task StartRecordingAsync(string path);
+    Task StopRecordingAsync();
+}

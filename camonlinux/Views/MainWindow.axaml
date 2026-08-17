@@ -1,0 +1,102 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:camonlinux.ViewModels"
+        xmlns:models="using:camonlinux.Models"
+        xmlns:local="using:camonlinux.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="960" d:DesignHeight="600"
+        x:Class="camonlinux.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="camonlinux"
+        Width="960" Height="600"
+        MinWidth="640" MinHeight="480">
+
+    <DockPanel Background="Black">
+
+        <!-- Top toolbar -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                    <ToggleButton IsChecked="{Binding Mirrored}"
+                                  ToolTip.Tip="Mirror the camera view">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x21C4;"/>
+                            <TextBlock Text="Mirror"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <Button Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Scan for cameras">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x21BB;"/>
+                            <TextBlock Text="Devices"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding OpenMediaFolderCommand}" ToolTip.Tip="Open the photos folder">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x1F4C2;"/>
+                            <TextBlock Text="Folder"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <ComboBox ItemsSource="{Binding Devices}"
+                          SelectedItem="{Binding SelectedDevice}"
+                          PlaceholderText="Select a camera"
+                          HorizontalAlignment="Stretch"
+                          MaxWidth="360"
+                          DisplayMemberBinding="{Binding Name}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Gallery panel -->
+        <Border DockPanel.Dock="Right" Width="230" Background="#202020">
+            <DockPanel>
+                <Button DockPanel.Dock="Bottom" Margin="8" Content="Delete"
+                        Command="{Binding DeleteSelectedCommand}"/>
+                <TextBlock DockPanel.Dock="Top" Margin="12,10" Text="Recent captures"
+                           FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                <ListBox ItemsSource="{Binding GalleryItems}"
+                         SelectedItem="{Binding SelectedGalleryItem}"
+                         Margin="4,0,4,8"
+                         Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:MediaItem">
+                            <TextBlock Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" Margin="6,2"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Capture controls -->
+        <Border DockPanel.Dock="Bottom" Padding="10" Background="#202020">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
+                <TextBlock Text="{Binding RecordingTime}" FontSize="16" FontFamily="monospace"
+                           Foreground="#FF5252" IsVisible="{Binding IsRecording}"
+                           VerticalAlignment="Center"/>
+                <Button Content="Take Photo" Command="{Binding TakePhotoCommand}"
+                        FontSize="15" Padding="20,8"/>
+                <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
+                        FontSize="15" Padding="20,8"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Preview area -->
+        <Grid>
+            <local:VideoSurface x:Name="VideoSurfaceControl"/>
+            <Border Background="#80000000" CornerRadius="6" Padding="14,8"
+                    IsVisible="{Binding IsBusy}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Looking for cameras…" Foreground="White"/>
+            </Border>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding !IsPreviewActive}"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="32"
+                       MaxWidth="480"/>
+        </Grid>
+    </DockPanel>
+</Window>

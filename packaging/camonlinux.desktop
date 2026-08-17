@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=camonlinux
+GenericName=Webcam Application
+Comment=Take photos and record videos with your webcam
+Exec=camonlinux
+Icon=camonlinux
+Terminal=false
+Categories=AudioVideo;AudioVideoEditing;Graphics;
+StartupNotify=true
+Keywords=webcam;camera;photo;video;record;
