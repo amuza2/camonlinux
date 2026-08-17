@@ -103,6 +103,7 @@
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
                             IsVisible="{Binding !ShowEffectsPanel}">
+                    <Button Content="Play video" Command="{Binding PlaySelectedCommand}"/>
                     <Button Content="Rename" Command="{Binding RenameSelectedCommand}"/>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <Button Content="Copy" Command="{Binding CopySelectedCommand}" HorizontalAlignment="Stretch"/>

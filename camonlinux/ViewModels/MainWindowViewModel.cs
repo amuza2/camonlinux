@@ -58,6 +58,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DeleteSelectedCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PlaySelectedCommand))]
     private MediaItem? _selectedGalleryItem;
 
     [ObservableProperty]
@@ -961,6 +962,25 @@ public partial class MainWindowViewModel : ViewModelBase
             System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)));
         return Path.Combine(Path.GetTempPath(), "camonlinux_gallery", hash + ".png");
     }
+
+    [RelayCommand(CanExecute = nameof(CanPlaySelected))]
+    private void PlaySelected()
+    {
+        if (SelectedGalleryItem is null)
+            return;
+
+        // Launch the system default video player.
+        try
+        {
+            Process.Start(new ProcessStartInfo("xdg-open", SelectedGalleryItem.Path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not open the video: {ex.Message}";
+        }
+    }
+
+    private bool CanPlaySelected() => SelectedGalleryItem is { IsVideo: true };
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private Task DeleteSelectedAsync()
