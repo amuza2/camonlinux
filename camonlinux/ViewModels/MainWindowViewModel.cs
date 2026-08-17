@@ -90,6 +90,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _countdownText = "";
 
     [ObservableProperty]
+    private bool _isFlashing;
+
+    [ObservableProperty]
     private string _selectedRotation = "0°";
 
     [ObservableProperty]
@@ -650,6 +653,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var path = NextPhotoPath(_settings.Settings.PhotoDirectory);
 
+        // White flash as visual confirmation of the capture.
+        IsFlashing = true;
         try
         {
             await _capture.TakePhotoAsync(path);
@@ -660,6 +665,11 @@ public partial class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusMessage = $"Could not take a photo: {ex.Message}";
+        }
+        finally
+        {
+            await Task.Delay(80);
+            IsFlashing = false;
         }
     }
 
