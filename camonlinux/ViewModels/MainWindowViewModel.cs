@@ -664,6 +664,12 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Save();
 
         _capture.Effect = BuildEffectFilter(effect, value);
+        // videobalance-based effects are adjustable live — push the new value to the
+        // running element instead of rebuilding the pipeline, so dragging the
+        // intensity slider is smooth (and works even mid-recording).
+        if (_capture.ApplyEffectIntensity(value))
+            return;
+
         if (IsPreviewActive && !IsRecording && SelectedDevice is not null)
             _ = StartPreviewAsync(SelectedDevice);
     }

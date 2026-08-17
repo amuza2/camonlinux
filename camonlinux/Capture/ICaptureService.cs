@@ -67,6 +67,12 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 
+    /// <summary>
+    /// Live-adjusts the current effect's intensity on the running pipeline
+    /// (e.g. videobalance saturation) without rebuilding it. Returns true if applied.
+    /// </summary>
+    bool ApplyEffectIntensity(double value);
+
     CameraDevice? CurrentDevice { get; }
     IReadOnlyList<CameraDevice> Devices { get; }
 

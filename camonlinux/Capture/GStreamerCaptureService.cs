@@ -63,6 +63,8 @@ public sealed class GStreamerCaptureService : ICaptureService
     private Element? _recordFileSink;
     private Element? _audioQueue;
     private Element? _micVolume;
+    private Element? _liveEffectElement;
+    private string _liveEffectProperty = "";
     private string? _audioSource;
     private bool _micMuted;
     private string _resolution = "";
@@ -502,11 +504,29 @@ public sealed class GStreamerCaptureService : ICaptureService
                $"videoscale ! video/x-raw,width={w},height={h} ! videoconvert ! ";
     }
 
+    /// <summary>
+    /// The effect chain for a pipeline description. A standalone <c>videobalance</c>
+    /// effect gets a fixed element name so its intensity (saturation) can be
+    /// adjusted LIVE on the running pipeline without rebuilding it.
+    /// </summary>
+    private string EffectStage(string effect)
+    {
+        var trimmed = effect.Trim();
+        if (trimmed.StartsWith("videobalance", StringComparison.Ordinal))
+        {
+            _liveEffectProperty = "saturation";
+            return "videobalance name=effectbalance" + trimmed.Substring("videobalance".Length);
+        }
+
+        _liveEffectProperty = "";
+        return trimmed;
+    }
+
     private string PreviewDescription(string effect)
     {
         var rotation = Rotation == "auto" ? "" : $"videoflip video-direction={Rotation} ! ";
         var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
-        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{effect} ! ";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{EffectStage(effect)} ! ";
         // A trailing videoconvert lets effects (e.g. frei0r filters) negotiate their
         // preferred format and still bridge to the BGRx caps the appsink needs.
         return
@@ -518,7 +538,7 @@ public sealed class GStreamerCaptureService : ICaptureService
     {
         var rotation = Rotation == "auto" ? "" : $"videoflip video-direction={Rotation} ! ";
         var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
-        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{effect} ! ";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{EffectStage(effect)} ! ";
         var overlay = ShowTimestamp
             ? $"textoverlay text=\"{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}\" valignment=bottom halignment=right font-desc=\"Sans 24\" ! "
             : "";
@@ -554,6 +574,15 @@ public sealed class GStreamerCaptureService : ICaptureService
             _audioQueue = bin.GetByName("audq");
             _micVolume = bin.GetByName("micvolume");
 
+            // Keep a reference to the live-adjustable effect element (videobalance)
+            // so intensity changes can skip a full pipeline rebuild.
+            _liveEffectElement = null;
+            if (!string.IsNullOrEmpty(_liveEffectProperty))
+            {
+                try { _liveEffectElement = bin.GetByName("effectbalance"); }
+                catch { _liveEffectElement = null; }
+            }
+
             _bus = _previewPipeline.GetBus();
             StartBusWatch();
             StartFrameLoop();
@@ -562,6 +591,28 @@ public sealed class GStreamerCaptureService : ICaptureService
         catch
         {
             StopPreviewInternal();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Live-adjusts the current effect's intensity on the running pipeline without
+    /// rebuilding it. Only works for effects backed by a mutable element property
+    /// (currently videobalance saturation). Returns true when applied.
+    /// </summary>
+    public bool ApplyEffectIntensity(double value)
+    {
+        var element = _liveEffectElement;
+        if (element is null || string.IsNullOrEmpty(_liveEffectProperty))
+            return false;
+
+        try
+        {
+            element.SetProperty(_liveEffectProperty, new GObject.Value(value));
+            return true;
+        }
+        catch
+        {
             return false;
         }
     }
