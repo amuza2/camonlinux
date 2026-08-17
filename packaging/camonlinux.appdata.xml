@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>camonlinux.desktop</id>
+  <name>camonlinux</name>
+  <summary>Take photos and record videos with your webcam</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A simple, modern webcam app for Linux — take photos and record videos with
+      your webcam. Inspired by KDE's Kamoso, but written from scratch in C# with
+      Avalonia UI and a GStreamer capture backend.
+    </p>
+    <ul>
+      <li>Live preview with 25+ built-in effects plus frei0r filters</li>
+      <li>Photos (JPEG/PNG) with burst mode, self-timer and camera-shutter sound</li>
+      <li>Videos (H.264 + AAC, MKV) with mic audio, rotation, digital zoom and auto-split</li>
+      <li>Live camera controls — brightness, white balance, exposure, focus, gain, sharpness</li>
+      <li>Gallery with thumbnails, an in-app photo viewer, and batch operations</li>
+      <li>Device hot-plug detection, keyboard shortcuts, fullscreen</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">camonlinux.desktop</launchable>
+  <url type="homepage">https://github.com/amuza2/camonlinux</url>
+  <url type="bugtracker">https://github.com/amuza2/camonlinux/issues</url>
+  <provides>
+    <binary>camonlinux</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2026-08-17">
+      <description>
+        <p>Initial release — photos, videos, effects, audio capture, gallery and camera controls.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

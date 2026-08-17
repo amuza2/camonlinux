@@ -978,8 +978,9 @@ public sealed class GStreamerCaptureService : ICaptureService
                 break;
 
             // Returns immediately when a sample is queued (max-buffers=1, drop=true),
-            // otherwise blocks up to the 20ms timeout.
-            using var sample = sink.TryPullSample((Gst.ClockTime)20_000_000UL);
+            // otherwise blocks up to the 33ms timeout. 33ms aligns the idle poll rate
+            // with the usual ~30 fps camera, cutting wakeups vs the previous 20ms.
+            using var sample = sink.TryPullSample((Gst.ClockTime)33_000_000UL);
             if (sample is null)
                 continue;
 

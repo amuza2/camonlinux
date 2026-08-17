@@ -1,0 +1,39 @@
+# Maintainer: Your Name <you@example.com>
+# NOTE: replace the maintainer name/email before publishing to the AUR.
+
+pkgname=camonlinux
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A simple, modern webcam app for Linux - take photos and record videos with your webcam"
+arch=('x86_64')
+url="https://github.com/amuza2/camonlinux"
+license=('MIT')
+depends=('dotnet-runtime' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good'
+         'gst-plugins-bad' 'gst-plugins-ugly' 'libnotify' 'v4l-utils')
+optdepends=('frei0r-plugins: additional (frei0r) effects'
+            'pipewire: sound server for audio capture')
+makedepends=('git' 'dotnet-sdk')
+provides=("$pkgname")
+conflicts=("$pkgname")
+source=("$pkgname::git+https://github.com/amuza2/camonlinux.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  git describe --tags --always 2>/dev/null | sed 's/^v//' || echo "$pkgver"
+}
+
+build() {
+  cd "$pkgname"
+  dotnet publish camonlinux -c Release -r linux-x64 --self-contained false -o "$srcdir/publish"
+}
+
+package() {
+  cd "$srcdir"
+  install -d "$pkgdir/usr/lib/$pkgname"
+  cp -r publish/* "$pkgdir/usr/lib/$pkgname/"
+  install -Dm755 "$pkgdir/usr/lib/$pkgname/camonlinux" "$pkgdir/usr/bin/camonlinux"
+  install -Dm644 "$pkgname/packaging/camonlinux.desktop" "$pkgdir/usr/share/applications/camonlinux.desktop"
+  install -Dm644 "$pkgname/packaging/camonlinux.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/camonlinux.svg"
+  install -Dm644 "$pkgname/packaging/camonlinux.appdata.xml" "$pkgdir/usr/share/metainfo/camonlinux.appdata.xml"
+}
