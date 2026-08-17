@@ -161,7 +161,7 @@
                        Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
                        IsVisible="{Binding IsCountingDown}">
                 <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
+                    <DropShadowEffect BlurRadius="12" OffsetX="0" OffsetY="0" Opacity="0.9"/>
                 </TextBlock.Effect>
             </TextBlock>
         </Grid>
