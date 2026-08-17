@@ -12,7 +12,7 @@ namespace camonlinux.Masking.Effects;
 public sealed class GradientMaskEffect : IMaskEffect
 {
     public string Name => "Gradient";
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
     public GradientMaskSettings Settings { get; }
 
     public GradientMaskEffect(GradientMaskSettings settings) => Settings = settings;

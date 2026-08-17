@@ -31,6 +31,19 @@ public partial class MainWindow : Window
     public void ConnectCapture(ICaptureService capture, MaskPipeline? maskPipeline)
     {
         _maskPipeline = maskPipeline;
+
+        // Composite the mask alpha in software while masking is enabled; fall back to
+        // the fast copy path otherwise.
+        if (DataContext is MainWindowViewModel vm)
+        {
+            VideoSurfaceControl.CompositeAlpha = vm.IsMaskEnabled;
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainWindowViewModel.IsMaskEnabled))
+                    VideoSurfaceControl.CompositeAlpha = vm.IsMaskEnabled;
+            };
+        }
+
         capture.FrameReady += (_, frame) =>
         {
             if (_maskPipeline is { Enabled: true } && frame.Data.Length > 0)
@@ -50,12 +63,15 @@ public partial class MainWindow : Window
         vm.IsMaskEnabled = tb.IsChecked == true;
         if (vm.IsMaskEnabled)
         {
-            _maskEditorWindow ??= new MaskEditorWindow { DataContext = vm.MaskEditor };
-            _maskEditorWindow.Closed += (_, _) =>
+            if (_maskEditorWindow is null)
             {
-                _maskEditorWindow = null;
-                vm.IsMaskEnabled = false;
-            };
+                _maskEditorWindow = new MaskEditorWindow { DataContext = vm.MaskEditor };
+                _maskEditorWindow.Closed += (_, _) =>
+                {
+                    _maskEditorWindow = null;
+                    vm.IsMaskEnabled = false;
+                };
+            }
             _maskEditorWindow.Show(this);
         }
         else if (_maskEditorWindow is not null)

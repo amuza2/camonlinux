@@ -14,7 +14,7 @@ namespace camonlinux.Masking.Effects;
 public sealed class ChromaKeyMaskEffect : IMaskEffect
 {
     public string Name => "Chroma Key";
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
     public ChromaKeyMaskSettings Settings { get; }
 
     public ChromaKeyMaskEffect(ChromaKeyMaskSettings settings) => Settings = settings;

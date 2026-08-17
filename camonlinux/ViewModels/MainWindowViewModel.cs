@@ -310,13 +310,24 @@ public partial class MainWindowViewModel : ViewModelBase
         var adjustment = new ColorAdjustmentMaskSettings();
         var chroma = new ChromaKeyMaskSettings();
         var pipeline = new MaskPipeline();
-        pipeline.Effects.Add(new ShapeMaskEffect(shape));
-        pipeline.Effects.Add(new GradientMaskEffect(gradient));
-        pipeline.Effects.Add(new ChromaKeyMaskEffect(chroma));
-        pipeline.Effects.Add(new FeatherMaskEffect(feather));
-        pipeline.Effects.Add(new ColorAdjustmentMaskEffect(adjustment));
+        var shapeEffect = new ShapeMaskEffect(shape);
+        var gradientEffect = new GradientMaskEffect(gradient);
+        var chromaEffect = new ChromaKeyMaskEffect(chroma);
+        var featherEffect = new FeatherMaskEffect(feather);
+        var adjustmentEffect = new ColorAdjustmentMaskEffect(adjustment);
+        pipeline.Effects.Add(shapeEffect);
+        pipeline.Effects.Add(gradientEffect);
+        pipeline.Effects.Add(chromaEffect);
+        pipeline.Effects.Add(featherEffect);
+        pipeline.Effects.Add(adjustmentEffect);
         MaskPipeline = pipeline;
-        MaskEditor = new MaskEditorViewModel(pipeline, shape, gradient, feather, adjustment, chroma);
+        MaskEditor = new MaskEditorViewModel(
+            pipeline, shape, gradient, feather, adjustment, chroma,
+            shapeEffect, gradientEffect, chromaEffect, featherEffect, adjustmentEffect);
+
+        // Keep the toolbar Mask toggle and the editor's Enable toggle in sync; the
+        // pipeline is only applied when enabled.
+        MaskEditor.EnabledChanged += value => IsMaskEnabled = value;
     }
 
     /// <summary>The real-time masking pipeline (applied to each preview frame on the streaming thread).</summary>
@@ -324,6 +335,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     /// <summary>View model for the Mask Editor window (shares the pipeline + settings).</summary>
     public MaskEditorViewModel MaskEditor { get; }
+
+    partial void OnIsMaskEnabledChanged(bool value)
+    {
+        MaskPipeline.Enabled = value;
+        MaskEditor.Enabled = value;
+    }
 
     private void LoadEffects()
     {

@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -19,6 +20,12 @@ public partial class MaskEditorViewModel : ObservableObject
     public Masking.ColorAdjustmentMaskSettings Adjustment { get; }
     public Masking.ChromaKeyMaskSettings Chroma { get; }
 
+    private readonly Masking.IMaskEffect _shapeEffect;
+    private readonly Masking.IMaskEffect _gradientEffect;
+    private readonly Masking.IMaskEffect _chromaEffect;
+    private readonly Masking.IMaskEffect _featherEffect;
+    private readonly Masking.IMaskEffect _adjustmentEffect;
+
     public string[] MaskModeOptions { get; } = { "Alpha Mask", "Adjustment Mask" };
     public string[] ShapeOptions { get; } =
     {
@@ -38,13 +45,26 @@ public partial class MaskEditorViewModel : ObservableObject
     [ObservableProperty] private int _featherTypeIndex;
     [ObservableProperty] private int _superModeIndex;
 
+    // Per-effect enable toggles (each mask type is off until the user turns it on;
+    // only the shape mask is on by default so the toolbar toggle shows the shape).
+    [ObservableProperty] private bool _shapeEnabled;
+    [ObservableProperty] private bool _gradientEnabled;
+    [ObservableProperty] private bool _chromaEnabled;
+    [ObservableProperty] private bool _featherEnabled;
+    [ObservableProperty] private bool _adjustmentEnabled;
+
     public MaskEditorViewModel(
         Masking.MaskPipeline pipeline,
         Masking.ShapeMaskSettings shape,
         Masking.GradientMaskSettings gradient,
         Masking.FeatherMaskSettings feather,
         Masking.ColorAdjustmentMaskSettings adjustment,
-        Masking.ChromaKeyMaskSettings chroma)
+        Masking.ChromaKeyMaskSettings chroma,
+        Masking.IMaskEffect shapeEffect,
+        Masking.IMaskEffect gradientEffect,
+        Masking.IMaskEffect chromaEffect,
+        Masking.IMaskEffect featherEffect,
+        Masking.IMaskEffect adjustmentEffect)
     {
         Pipeline = pipeline;
         Shape = shape;
@@ -52,6 +72,11 @@ public partial class MaskEditorViewModel : ObservableObject
         Feather = feather;
         Adjustment = adjustment;
         Chroma = chroma;
+        _shapeEffect = shapeEffect;
+        _gradientEffect = gradientEffect;
+        _chromaEffect = chromaEffect;
+        _featherEffect = featherEffect;
+        _adjustmentEffect = adjustmentEffect;
         _enabled = pipeline.Enabled;
         _modeIndex = pipeline.Mode == Masking.MaskMode.Adjustment ? 1 : 0;
         _invert = pipeline.Invert;
@@ -60,14 +85,34 @@ public partial class MaskEditorViewModel : ObservableObject
         _cornerTypeIndex = (int)shape.CornerType;
         _featherTypeIndex = (int)shape.Feather;
         _superModeIndex = (int)shape.SuperMode;
+        _shapeEnabled = shapeEffect.Enabled;
+        _gradientEnabled = gradientEffect.Enabled;
+        _chromaEnabled = chromaEffect.Enabled;
+        _featherEnabled = featherEffect.Enabled;
+        _adjustmentEnabled = adjustmentEffect.Enabled;
         shape.PropertyChanged += OnShapeSettingsChanged;
     }
 
-    partial void OnEnabledChanged(bool value) => Pipeline.Enabled = value;
+    /// <summary>Raised when the user toggles enable (so the main window's toolbar toggle stays in sync).</summary>
+    public event Action<bool>? EnabledChanged;
+
+    partial void OnEnabledChanged(bool value)
+    {
+        Pipeline.Enabled = value;
+        EnabledChanged?.Invoke(value);
+    }
 
     partial void OnModeIndexChanged(int value) => Pipeline.Mode = value == 1 ? Masking.MaskMode.Adjustment : Masking.MaskMode.Alpha;
 
     partial void OnInvertChanged(bool value) => Pipeline.Invert = value;
+
+    // --- per-effect enable (only the shape is on by default) ---
+
+    partial void OnShapeEnabledChanged(bool value) => _shapeEffect.Enabled = value;
+    partial void OnGradientEnabledChanged(bool value) => _gradientEffect.Enabled = value;
+    partial void OnChromaEnabledChanged(bool value) => _chromaEffect.Enabled = value;
+    partial void OnFeatherEnabledChanged(bool value) => _featherEffect.Enabled = value;
+    partial void OnAdjustmentEnabledChanged(bool value) => _adjustmentEffect.Enabled = value;
 
     partial void OnShapeIndexChanged(int value)
     {

@@ -11,11 +11,22 @@
     <DockPanel>
         <!-- Global controls -->
         <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <ToggleButton IsChecked="{Binding Enabled}" Content="Enable mask"/>
-                <TextBlock Text="Mode" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox ItemsSource="{Binding MaskModeOptions}" SelectedIndex="{Binding ModeIndex}" Width="150"/>
-                <ToggleButton IsChecked="{Binding Invert}" Content="Invert"/>
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <ToggleButton IsChecked="{Binding Enabled}" Content="Enable mask"/>
+                    <TextBlock Text="Mode" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding MaskModeOptions}" SelectedIndex="{Binding ModeIndex}" Width="150"/>
+                    <ToggleButton IsChecked="{Binding Invert}" Content="Invert"/>
+                </StackPanel>
+                <!-- Per-effect enable toggles: each mask type is off until enabled here. -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Effects:" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ToggleButton IsChecked="{Binding ShapeEnabled}" Content="Shape"/>
+                    <ToggleButton IsChecked="{Binding GradientEnabled}" Content="Gradient"/>
+                    <ToggleButton IsChecked="{Binding ChromaEnabled}" Content="Chroma"/>
+                    <ToggleButton IsChecked="{Binding FeatherEnabled}" Content="Feather"/>
+                    <ToggleButton IsChecked="{Binding AdjustmentEnabled}" Content="Adjust"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 

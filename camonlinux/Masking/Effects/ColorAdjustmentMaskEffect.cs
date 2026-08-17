@@ -14,7 +14,7 @@ namespace camonlinux.Masking.Effects;
 public sealed class ColorAdjustmentMaskEffect : IMaskEffect, IColorAdjustmentEffect
 {
     public string Name => "Color Adjustment";
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
     public ColorAdjustmentMaskSettings Settings { get; }
 
     public ColorAdjustmentMaskEffect(ColorAdjustmentMaskSettings settings) => Settings = settings;

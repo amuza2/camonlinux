@@ -11,7 +11,7 @@ namespace camonlinux.Masking.Effects;
 public sealed class FeatherMaskEffect : IMaskEffect, IInPlaceEffect
 {
     public string Name => "Feather";
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
     public FeatherMaskSettings Settings { get; }
 
     private byte[] _tmp = Array.Empty<byte>();

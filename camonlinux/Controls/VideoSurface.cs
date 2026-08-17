@@ -19,7 +19,16 @@ public sealed class VideoSurface : Control
 {
     private readonly object _sync = new();
     private WriteableBitmap? _bitmap;
+    private byte[]? _scratch;
     private static readonly DrawingBrush s_checker = CreateChecker();
+
+    /// <summary>
+    /// When true, the pushed frame's alpha channel is composited in software over a
+    /// checkerboard (so transparent mask areas are visible). Avalonia's
+    /// <see cref="DrawingContext.DrawImage"/> renders <c>WriteableBitmap</c>s with
+    /// their alpha ignored on this platform, so the blend is done here instead.
+    /// </summary>
+    public bool CompositeAlpha { get; set; }
 
     private static DrawingBrush CreateChecker()
     {
@@ -35,6 +44,16 @@ public sealed class VideoSurface : Control
             TileMode = TileMode.Tile,
             DestinationRect = new RelativeRect(0, 0, size * 2, size * 2, RelativeUnit.Absolute)
         };
+    }
+
+    /// <summary>Checkerboard cell colour (dark/light) for a pixel — matches the background brush.</summary>
+    private static (byte B, byte G, byte R) CheckerColor(int x, int y)
+    {
+        var tx = x & 31;
+        var ty = y & 31;
+        return ((tx < 16 && ty < 16) || (tx >= 16 && ty >= 16))
+            ? ((byte)0x3a, (byte)0x3a, (byte)0x3a)
+            : ((byte)0x24, (byte)0x24, (byte)0x24);
     }
 
     /// <summary>Called from the GStreamer streaming thread; marshals to the UI thread.</summary>
@@ -64,14 +83,62 @@ public sealed class VideoSurface : Control
 
             using var framebuffer = _bitmap.Lock();
             var source = frame.Data;
-            var rowBytes = Math.Min(framebuffer.RowBytes, frame.Stride);
-            for (var y = 0; y < frame.Height; y++)
+
+            if (CompositeAlpha)
             {
-                Marshal.Copy(
-                    source,
-                    y * frame.Stride,
-                    framebuffer.Address + (y * framebuffer.RowBytes),
-                    rowBytes);
+                // Software-composite the video over the checkerboard into an opaque
+                // buffer, so alpha-masked (transparent) regions are visible.
+                var w = frame.Width;
+                var h = frame.Height;
+                if (_scratch is null || _scratch.Length != source.Length)
+                    _scratch = new byte[source.Length];
+                var dst = _scratch;
+                for (var y = 0; y < h; y++)
+                {
+                    var row = y * w;
+                    for (var x = 0; x < w; x++)
+                    {
+                        var o = (row + x) * 4;
+                        var a = source[o + 3];
+                        if (a == 255)
+                        {
+                            dst[o] = source[o];
+                            dst[o + 1] = source[o + 1];
+                            dst[o + 2] = source[o + 2];
+                        }
+                        else
+                        {
+                            var (cb, cg, cr) = CheckerColor(x, y);
+                            if (a == 0)
+                            {
+                                dst[o] = cb;
+                                dst[o + 1] = cg;
+                                dst[o + 2] = cr;
+                            }
+                            else
+                            {
+                                var ia = 255 - a;
+                                dst[o] = (byte)((source[o] * a + cb * ia) / 255);
+                                dst[o + 1] = (byte)((source[o + 1] * a + cg * ia) / 255);
+                                dst[o + 2] = (byte)((source[o + 2] * a + cr * ia) / 255);
+                            }
+                        }
+                        dst[o + 3] = 255;
+                    }
+                }
+                Marshal.Copy(dst, 0, framebuffer.Address, dst.Length);
+            }
+            else
+            {
+                var rowBytes = Math.Min(framebuffer.RowBytes, frame.Stride);
+                for (var y = 0; y < frame.Height; y++)
+                {
+                    Marshal.Copy(
+                        source,
+                        y * frame.Stride,
+                        framebuffer.Address + (y * framebuffer.RowBytes),
+                        rowBytes);
+                }
             }
         }
 
