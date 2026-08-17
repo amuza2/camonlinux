@@ -67,7 +67,7 @@ public partial class MainWindow : Window
     /// Toolbar Webcam toggle: shares the live (masked/adjusted) preview as a virtual
     /// webcam via v4l2loopback. If the module isn't loaded, tells the user how to.
     /// </summary>
-    private void OnVirtualCamToggled(object? sender, RoutedEventArgs e)
+    private async void OnVirtualCamToggled(object? sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
             return;
@@ -76,9 +76,9 @@ public partial class MainWindow : Window
         vm.IsVirtualCamEnabled = enable;
         if (_virtualCamera is null)
         {
-            vm.StatusMessage = "Virtual webcam is not available.";
             vm.IsVirtualCamEnabled = false;
             tb.IsChecked = false;
+            vm.ShowToast("Virtual webcam is not available.");
             return;
         }
 
@@ -87,10 +87,11 @@ public partial class MainWindow : Window
             var device = VirtualCameraService.FindLoopbackDevice();
             if (device is null)
             {
-                vm.StatusMessage =
-                    "Virtual webcam unavailable — run: sudo modprobe v4l2loopback video_nr=10 card_label=\"camonlinux Virtual Camera\" exclusive_caps=1";
                 vm.IsVirtualCamEnabled = false;
                 tb.IsChecked = false;
+                vm.ShowToast("Virtual webcam unavailable — v4l2loopback module not loaded");
+                var help = new VirtualCamHelpWindow();
+                await help.ShowDialog(this);
                 return;
             }
 
@@ -98,19 +99,19 @@ public partial class MainWindow : Window
             var h = _lastFrameH > 0 ? _lastFrameH : 720;
             if (_virtualCamera.Start(device, w, h, 30))
             {
-                vm.StatusMessage = $"Virtual webcam live on {device}";
+                vm.ShowToast($"Virtual webcam live on {device}");
             }
             else
             {
-                vm.StatusMessage = $"Failed to start virtual webcam: {_virtualCamera.LastError}";
                 vm.IsVirtualCamEnabled = false;
                 tb.IsChecked = false;
+                vm.ShowToast($"Failed to start virtual webcam: {_virtualCamera.LastError}");
             }
         }
         else
         {
             _virtualCamera.Stop();
-            vm.StatusMessage = "Virtual webcam stopped.";
+            vm.ShowToast("Virtual webcam stopped.");
         }
     }
 

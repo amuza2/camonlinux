@@ -1452,7 +1452,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>Shows a brief overlay toast that auto-hides.</summary>
-    private void ShowToast(string message)
+    public void ShowToast(string message)
     {
         ToastText = message;
         IsToastVisible = true;

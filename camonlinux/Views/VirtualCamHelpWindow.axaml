@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="camonlinux.Views.VirtualCamHelpWindow"
+        Title="Virtual Webcam Setup"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+    <StackPanel Margin="16" Spacing="12">
+        <TextBlock Text="The virtual webcam needs the v4l2loopback kernel module."
+                   FontSize="15" FontWeight="SemiBold" Foreground="White"/>
+        <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="#CCCCCC"
+                   Text="It's installed on your system but not loaded. Run this command once (a reboot clears it):"/>
+        <TextBox x:Name="CommandBox" IsReadOnly="True" FontFamily="monospace" FontSize="12"
+                 Text="sudo modprobe v4l2loopback video_nr=10 card_label=&quot;camonlinux Virtual Camera&quot; exclusive_caps=1"/>
+        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#999999"
+                   Text="Tip: to load it automatically at boot, add a line &quot;v4l2loopback&quot; to /etc/modules-load.d/ and the modprobe options to /etc/modprobe.d/."/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Copy command" Click="OnCopy" MinWidth="110"/>
+            <Button Content="Close" Classes="accent" Click="OnClose" MinWidth="80"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
