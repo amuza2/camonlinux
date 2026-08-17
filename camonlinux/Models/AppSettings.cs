@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace camonlinux.Models;
 
 /// <summary>User settings, persisted as JSON in ~/.config/camonlinux/settings.json.</summary>
@@ -14,5 +16,6 @@ public sealed class AppSettings
     public string Rotation { get; set; } = "auto";
     public double Zoom { get; set; } = 1.0;
     public string PhotoFormat { get; set; } = "jpeg";
+    public List<string> FavoriteEffects { get; set; } = new();
     public string? LastDeviceId { get; set; }
 }

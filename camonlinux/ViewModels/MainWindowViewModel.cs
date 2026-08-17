@@ -200,6 +200,34 @@ public partial class MainWindowViewModel : ViewModelBase
             new EffectOption("frei0r-filter-ntsc", "NTSC", "frei0r-filter-ntsc"),
             new EffectOption("frei0r-filter-water", "Water", "frei0r-filter-water"),
             new EffectOption("frei0r-filter-glitch0r", "Glitch", "frei0r-filter-glitch0r"));
+
+        // Restore pinned favorites, then wire toggling -> persistence + reorder.
+        var favorites = _settings.Settings.FavoriteEffects ?? new List<string>();
+        foreach (var effect in Effects)
+            effect.IsFavorite = favorites.Contains(effect.Id);
+        foreach (var effect in Effects)
+            effect.PropertyChanged += OnEffectPropertyChanged;
+    }
+
+    private void OnEffectPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(EffectOption.IsFavorite) || sender is not EffectOption effect)
+            return;
+
+        _settings.Settings.FavoriteEffects = Effects.Where(x => x.IsFavorite).Select(x => x.Id).ToList();
+        _settings.Save();
+        ReorderEffects();
+    }
+
+    /// <summary>Pinned favorites first, preserving relative order of the rest.</summary>
+    private void ReorderEffects()
+    {
+        var selected = SelectedEffect;
+        var ordered = Effects.Where(e => e.IsFavorite).Concat(Effects.Where(e => !e.IsFavorite)).ToList();
+        Effects.Clear();
+        foreach (var effect in ordered)
+            Effects.Add(effect);
+        SelectedEffect = selected;
     }
 
     /// <summary>Adds effects only if their first pipeline element is available on this system.</summary>
@@ -424,7 +452,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedEffectChanged(EffectOption? value)
     {
-        _capture.Effect = value?.Filter ?? "";
+        var filter = value?.Filter ?? "";
+        if (_capture.Effect == filter)
+            return; // same effect re-selected (e.g. after a reorder) — no restart
+
+        _capture.Effect = filter;
 
         // The effect is baked into the pipeline, so restart the preview.
         // (Not while recording — it applies when the preview resumes.)

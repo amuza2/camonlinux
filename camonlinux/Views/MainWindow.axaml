@@ -89,8 +89,27 @@
                             <Border CornerRadius="4" Margin="3" Background="#40000000"
                                     BorderBrush="#33FFFFFF" BorderThickness="1">
                                 <StackPanel>
-                                    <Image Source="{Binding Thumbnail}" Width="100" Height="56"
-                                           Stretch="UniformToFill"/>
+                                    <Grid>
+                                        <Image Source="{Binding Thumbnail}" Width="100" Height="56"
+                                               Stretch="UniformToFill"/>
+                                        <ToggleButton IsChecked="{Binding IsFavorite}" Content="★"
+                                                      FontSize="11" Width="24" Height="20" Padding="0"
+                                                      HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                      Margin="2" ToolTip.Tip="Favorite — pin to the top">
+                                            <ToggleButton.Styles>
+                                                <Style Selector="ToggleButton">
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                </Style>
+                                                <Style Selector="ToggleButton:unchecked">
+                                                    <Setter Property="Foreground" Value="#B0B0B0"/>
+                                                </Style>
+                                                <Style Selector="ToggleButton:checked">
+                                                    <Setter Property="Foreground" Value="#FFD700"/>
+                                                </Style>
+                                            </ToggleButton.Styles>
+                                        </ToggleButton>
+                                    </Grid>
                                     <TextBlock Text="{Binding Name}" HorizontalAlignment="Center"
                                                FontSize="12" Margin="0,2"/>
                                 </StackPanel>

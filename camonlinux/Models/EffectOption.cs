@@ -18,6 +18,10 @@ public partial class EffectOption : ObservableObject
     [ObservableProperty]
     private Bitmap? _thumbnail;
 
+    /// <summary>Pinned to the top of the effects gallery.</summary>
+    [ObservableProperty]
+    private bool _isFavorite;
+
     public EffectOption(string id, string name, string filter)
     {
         Id = id;
