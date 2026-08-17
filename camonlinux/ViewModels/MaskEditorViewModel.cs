@@ -112,7 +112,14 @@ public partial class MaskEditorViewModel : ObservableObject
     partial void OnGradientEnabledChanged(bool value) => _gradientEffect.Enabled = value;
     partial void OnChromaEnabledChanged(bool value) => _chromaEffect.Enabled = value;
     partial void OnFeatherEnabledChanged(bool value) => _featherEffect.Enabled = value;
-    partial void OnAdjustmentEnabledChanged(bool value) => _adjustmentEffect.Enabled = value;
+
+    partial void OnAdjustmentEnabledChanged(bool value)
+    {
+        _adjustmentEffect.Enabled = value;
+        // Colour adjustments only run in Adjustment Mask mode, so switch modes
+        // automatically — toggling "Adjust" on must take effect immediately.
+        ModeIndex = value ? 1 : 0;
+    }
 
     partial void OnShapeIndexChanged(int value)
     {
