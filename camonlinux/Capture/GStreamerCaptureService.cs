@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using camonlinux.Models;
@@ -139,6 +140,9 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
     public int Saturation { get; set; } = 128;
+
+    /// <summary>PulseAudio source name to record from ("" = default).</summary>
+    public string AudioDevice { get; set; } = "";
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -394,6 +398,35 @@ public sealed class GStreamerCaptureService : ICaptureService
         }
     }
 
+    /// <summary>Lists PulseAudio/PipeWire sources (excluding monitors) for the audio picker.</summary>
+    public IReadOnlyList<string> GetAudioDevices()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("pactl", "list short sources")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            using var process = Process.Start(psi);
+            if (process is null)
+                return Array.Empty<string>();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(2000);
+            return output
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Where(line => !line.Contains(".monitor", StringComparison.OrdinalIgnoreCase))
+                .Select(line => line.Split('\t').Skip(1).FirstOrDefault())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct()
+                .ToList();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     private void StopPreviewInternal()
     {
         StopBusWatch();
@@ -489,9 +522,10 @@ public sealed class GStreamerCaptureService : ICaptureService
         var overlay = ShowTimestamp
             ? $"textoverlay text=\"{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}\" valignment=bottom halignment=right font-desc=\"Sans 24\" ! "
             : "";
-        // Audio branch: default mic -> optional live mute -> AAC, muxed into the MKV.
+        // Audio branch: selected (or default) mic -> optional live mute -> AAC, muxed into the MKV.
+        var audioSource = string.IsNullOrEmpty(AudioDevice) ? _audioSource : $"pulsesrc device=\"{AudioDevice}\"";
         var audio = includeAudio && _audioSource is not null
-            ? $" {_audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
+            ? $" {audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
               "! audioresample ! audio/x-raw,rate=48000,channels=2 ! fdkaacenc bitrate=128000 " +
               "! queue name=audq ! mux. "
             : "";

@@ -20,6 +20,7 @@ public sealed class AppSettings
     public int Brightness { get; set; } = 128;
     public int Contrast { get; set; } = 128;
     public int Saturation { get; set; } = 128;
+    public string AudioDevice { get; set; } = "";
     public List<string> FavoriteEffects { get; set; } = new();
     public Dictionary<string, double> EffectIntensities { get; set; } = new();
     public bool IsMaximized { get; set; } = true;

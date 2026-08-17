@@ -38,6 +38,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private Timer? _toastTimer;
     private Timer? _galleryRefreshDebounce;
     private bool _loadingIntensity;
+    private string? _recordingPath;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
     private Timer? _devicesTimer;
@@ -54,6 +55,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RotationOptions { get; } = new() { "0°", "90°", "180°", "270°" };
     public ObservableCollection<string> ZoomOptions { get; } = new() { "1×", "1.5×", "2×", "3×", "4×" };
     public ObservableCollection<string> PhotoFormatOptions { get; } = new() { "JPEG", "PNG" };
+    public ObservableCollection<string> AudioDevices { get; } = new();
+    public ObservableCollection<EffectOption> FilteredEffects { get; } = new();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -140,6 +143,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _showGalleryEmptyHint;
 
     [ObservableProperty]
+    private string _recordingSize = "";
+
+    [ObservableProperty]
+    private string _effectFilter = "";
+
+    [ObservableProperty]
+    private string _selectedAudioDevice = "Default";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -184,6 +196,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _capture.Brightness = settings.Settings.Brightness;
         _capture.Contrast = settings.Settings.Contrast;
         _capture.Saturation = settings.Settings.Saturation;
+        _capture.AudioDevice = settings.Settings.AudioDevice;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -254,6 +267,8 @@ public partial class MainWindowViewModel : ViewModelBase
             effect.IsFavorite = favorites.Contains(effect.Id);
         foreach (var effect in Effects)
             effect.PropertyChanged += OnEffectPropertyChanged;
+
+        RefreshFilteredEffects();
     }
 
     private void OnEffectPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -275,6 +290,22 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var effect in ordered)
             Effects.Add(effect);
         SelectedEffect = selected;
+        RefreshFilteredEffects();
+    }
+
+    partial void OnEffectFilterChanged(string value) => RefreshFilteredEffects();
+
+    private void RefreshFilteredEffects()
+    {
+        var filter = _effectFilter?.Trim() ?? "";
+        FilteredEffects.Clear();
+        foreach (var effect in Effects)
+        {
+            if (string.IsNullOrEmpty(filter)
+                || effect.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || effect.Id.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                FilteredEffects.Add(effect);
+        }
     }
 
     /// <summary>Adds effects only if their first pipeline element is available on this system.</summary>
@@ -305,6 +336,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // availability checks (frei0r etc.) reflect what's actually installed.
         LoadEffects();
         SelectedEffect = Effects.FirstOrDefault();
+        await LoadAudioDevicesAsync();
 
         var devices = await _capture.RefreshDevicesAsync();
 
@@ -921,10 +953,14 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 await _capture.StartRecordingAsync(path);
                 IsRecording = true;
+                _recordingPath = path;
                 _recordingStopwatch.Restart();
                 _recordingTimer = new Timer(
                     _ => Dispatcher.UIThread.Post(() =>
-                        RecordingTime = _recordingStopwatch.Elapsed.ToString(@"mm\:ss")),
+                    {
+                        RecordingTime = _recordingStopwatch.Elapsed.ToString(@"mm\:ss");
+                        RecordingSize = FormatFileSize(_recordingPath);
+                    }),
                     null,
                     TimeSpan.Zero,
                     TimeSpan.FromSeconds(1));
@@ -943,6 +979,8 @@ public partial class MainWindowViewModel : ViewModelBase
             _recordingTimer?.Dispose();
             _recordingTimer = null;
             RecordingTime = "00:00";
+            RecordingSize = "";
+            _recordingPath = null;
             StatusMessage = "Recording saved.";
             ShowToast("Recording saved");
             NotificationService.Notify("Video saved");
@@ -1108,6 +1146,55 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand]
     private void ToggleEffectsPanel() => ShowEffectsPanel = !ShowEffectsPanel;
+
+    [RelayCommand]
+    private void ToggleFullScreen()
+    {
+        var w = MainWindow;
+        if (w is null)
+            return;
+        w.WindowState = w.WindowState == WindowState.FullScreen ? WindowState.Maximized : WindowState.FullScreen;
+    }
+
+    /// <summary>Adjusts the digital zoom by half a step (used by the mouse wheel).</summary>
+    public void AdjustZoom(double wheelDelta)
+    {
+        var current = _capture.Zoom;
+        var next = Math.Clamp(current + (wheelDelta > 0 ? 0.5 : -0.5), 1.0, 4.0);
+        if (Math.Abs(next - current) < 0.001)
+            return;
+        SelectedZoom = MapZoomLabel(next); // OnSelectedZoomChanged rebuilds + persists
+    }
+
+    private async Task LoadAudioDevicesAsync()
+    {
+        var devices = await Task.Run(() => _capture.GetAudioDevices());
+        AudioDevices.Clear();
+        AudioDevices.Add("Default");
+        foreach (var device in devices)
+            AudioDevices.Add(device);
+
+        var saved = _settings.Settings.AudioDevice;
+        SelectedAudioDevice = string.IsNullOrEmpty(saved) ? "Default" : (AudioDevices.Contains(saved) ? saved : "Default");
+    }
+
+    partial void OnSelectedAudioDeviceChanged(string value)
+    {
+        var device = value == "Default" ? "" : value;
+        _settings.Settings.AudioDevice = device;
+        _settings.Save();
+        _capture.AudioDevice = device;
+    }
+
+    private static string FormatFileSize(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return "";
+        var bytes = new FileInfo(path).Length;
+        return bytes >= 1024 * 1024
+            ? $"{bytes / 1024.0 / 1024.0:0.#} MB"
+            : $"{bytes / 1024.0:0.#} KB";
+    }
 
     /// <summary>Debounces rapid file events (e.g. burst captures) and refreshes the gallery.</summary>
     private void OnMediaCollectionChanged()

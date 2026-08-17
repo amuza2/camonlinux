@@ -55,6 +55,12 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
     int Saturation { get; set; }
 
+    /// <summary>PulseAudio source name to record from ("" = default).</summary>
+    string AudioDevice { get; set; }
+
+    /// <summary>Lists available PulseAudio/PipeWire sources (excluding monitors).</summary>
+    IReadOnlyList<string> GetAudioDevices();
+
     /// <summary>Applies the current camera controls live via v4l2-ctl.</summary>
     void ApplyCameraControls();
 

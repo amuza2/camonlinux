@@ -33,6 +33,13 @@ public partial class MainWindow : Window
             vm.OpenSelectedCommand.Execute(null);
     }
 
+    /// <summary>Mouse wheel over the preview adjusts the digital zoom.</summary>
+    private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+            vm.AdjustZoom(e.Delta.Y);
+    }
+
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);

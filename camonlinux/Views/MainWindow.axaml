@@ -21,6 +21,7 @@
         <KeyBinding Gesture="B" Command="{Binding ToggleBurstCommand}"/>
         <KeyBinding Gesture="M" Command="{Binding ToggleMirrorCommand}"/>
         <KeyBinding Gesture="E" Command="{Binding ToggleEffectsPanelCommand}"/>
+        <KeyBinding Gesture="F11" Command="{Binding ToggleFullScreenCommand}"/>
     </Window.KeyBindings>
 
     <DockPanel Background="Black">
@@ -123,6 +124,9 @@
                             Width="220"/>
                 </StackPanel>
 
+                <TextBox DockPanel.Dock="Top" Margin="8,0,8,4" Watermark="Search effects…"
+                         Text="{Binding EffectFilter}" IsVisible="{Binding ShowEffectsPanel}"/>
+
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
                             IsVisible="{Binding !ShowEffectsPanel}">
                     <Button Content="Play video" Command="{Binding PlaySelectedCommand}"/>
@@ -135,7 +139,7 @@
                 </StackPanel>
 
                 <!-- Effects gallery -->
-                <ListBox ItemsSource="{Binding Effects}"
+                <ListBox ItemsSource="{Binding FilteredEffects}"
                          SelectedItem="{Binding SelectedEffect}"
                          IsVisible="{Binding ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">
@@ -215,6 +219,8 @@
                 <TextBlock Text="{Binding RecordingTime}" FontSize="16" FontFamily="monospace"
                            Foreground="#FF5252" IsVisible="{Binding IsRecording}"
                            VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding RecordingSize}" FontSize="14" Foreground="#FF8A80"
+                           IsVisible="{Binding IsRecording}" VerticalAlignment="Center"/>
                 <Button Content="Take Photo" Command="{Binding TakePhotoCommand}"
                         FontSize="15" Padding="20,8"/>
                 <ToggleButton IsChecked="{Binding MicEnabled}"
@@ -224,6 +230,10 @@
                         <TextBlock Text="Mic"/>
                     </StackPanel>
                 </ToggleButton>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Audio" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}" Width="180"/>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Text="Quality" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}" Width="86"/>
@@ -249,7 +259,7 @@
 
         <!-- Preview area -->
         <Grid>
-            <local:VideoSurface x:Name="VideoSurfaceControl"/>
+            <local:VideoSurface x:Name="VideoSurfaceControl" PointerWheelChanged="OnPreviewWheel"/>
             <Border Background="#80000000" CornerRadius="6" Padding="14,8"
                     IsVisible="{Binding IsBusy}"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
