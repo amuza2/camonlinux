@@ -34,6 +34,12 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Split recordings at this size (MB); 0 = no limit.</summary>
     long MaxFileSizeMB { get; set; }
 
+    /// <summary>Image rotation as a videoflip direction: "auto", "90r", "180", "90l".</summary>
+    string Rotation { get; set; }
+
+    /// <summary>Digital zoom factor (1.0 = none).</summary>
+    double Zoom { get; set; }
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 

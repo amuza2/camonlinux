@@ -40,6 +40,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> QualityOptions { get; } = new() { "Low", "Medium", "High" };
     public ObservableCollection<string> MaxSizeOptions { get; } = new() { "Unlimited", "500 MB", "1 GB", "2 GB" };
     public ObservableCollection<string> TimerOptions { get; } = new() { "Off", "3 s", "10 s" };
+    public ObservableCollection<string> RotationOptions { get; } = new() { "0°", "90°", "180°", "270°" };
+    public ObservableCollection<string> ZoomOptions { get; } = new() { "1×", "1.5×", "2×", "3×", "4×" };
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -86,6 +88,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _countdownText = "";
 
     [ObservableProperty]
+    private string _selectedRotation = "0°";
+
+    [ObservableProperty]
+    private string _selectedZoom = "1×";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -114,6 +122,10 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
         _timerSeconds = settings.Settings.TimerSeconds;
         _selectedTimer = MapTimerLabel(settings.Settings.TimerSeconds);
+        _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
+        _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
+        _capture.Rotation = settings.Settings.Rotation;
+        _capture.Zoom = settings.Settings.Zoom;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -360,6 +372,32 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static string MapTimerLabel(int seconds) => seconds switch { 3 => "3 s", 10 => "10 s", _ => "Off" };
+
+    partial void OnSelectedRotationChanged(string value)
+    {
+        var dir = value switch { "90°" => "90r", "180°" => "180", "270°" => "90l", _ => "auto" };
+        _settings.Settings.Rotation = dir;
+        _settings.Save();
+        _capture.Rotation = dir;
+        // Rotation is baked into the pipeline, so restart the preview.
+        if (IsPreviewActive && SelectedDevice is not null)
+            _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    partial void OnSelectedZoomChanged(string value)
+    {
+        var zoom = value switch { "1.5×" => 1.5, "2×" => 2.0, "3×" => 3.0, "4×" => 4.0, _ => 1.0 };
+        _settings.Settings.Zoom = zoom;
+        _settings.Save();
+        _capture.Zoom = zoom;
+        // Zoom is baked into the pipeline, so restart the preview.
+        if (IsPreviewActive && SelectedDevice is not null)
+            _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    private static string MapRotationLabel(string dir) => dir switch { "90r" => "90°", "180" => "180°", "90l" => "270°", _ => "0°" };
+
+    private static string MapZoomLabel(double zoom) => zoom switch { >= 4.0 => "4×", >= 3.0 => "3×", >= 2.0 => "2×", >= 1.5 => "1.5×", _ => "1×" };
 
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
 

@@ -71,8 +71,10 @@ public sealed class GStreamerCaptureService : ICaptureService
     private readonly Stopwatch _recSizeStopwatch = new();
     private readonly SemaphoreSlim _recordingGate = new(1, 1);
     private string? _recordPath;
-    private bool _splitting;
-    private CameraDevice? _currentDevice;
+    private bool _splitting;    private int _sourceWidth;
+    private int _sourceHeight;
+    private bool _zoomPending;
+    private bool _rebuildingPreview;    private CameraDevice? _currentDevice;
     private CameraFrame? _latestFrame;
     private Gst.Bus? _bus;
     private CancellationTokenSource? _busWatchCts;
@@ -116,6 +118,12 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>Split recordings at this size (MB); 0 = no limit.</summary>
     public long MaxFileSizeMB { get => _maxFileSizeMB; set => _maxFileSizeMB = value; }
+
+    /// <summary>Image rotation as a videoflip direction: "auto", "90r", "180", "90l".</summary>
+    public string Rotation { get; set; } = "auto";
+
+    /// <summary>Digital zoom factor (1.0 = none).</summary>
+    public double Zoom { get; set; } = 1.0;
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -303,13 +311,13 @@ public sealed class GStreamerCaptureService : ICaptureService
             : $"v4l2src device={_currentDevice!.Path} ! {mode.Value.Caps}";
     }
 
-    private (string Caps, bool Jpeg)? CurrentMode()
+    private (string Caps, bool Jpeg, int W, int H)? CurrentMode()
     {
         if (string.IsNullOrEmpty(_resolution) || _resolution == "Default")
             return null;
-        foreach (var (label, caps, _, _, _, jpeg) in s_modes)
+        foreach (var (label, caps, _, w, h, jpeg) in s_modes)
             if (label == _resolution)
-                return (caps, jpeg);
+                return (caps, jpeg, w, h);
         return null;
     }
 
@@ -372,21 +380,63 @@ public sealed class GStreamerCaptureService : ICaptureService
         TryBuildPipeline(PreviewDescription(""));
     }
 
+    /// <summary>
+    /// A digital-zoom stage (crop the center, scale back to full size) inserted after
+    /// the source. Requires the source resolution: the selected mode's size, or the
+    /// size of the last received frame. Returns "" when zoom is 1x or the size isn't
+    /// known yet (the preview is rebuilt once a frame establishes it).
+    /// </summary>
+    private string ZoomStage()
+    {
+        if (Zoom <= 1.0)
+            return "";
+
+        int w, h;
+        var mode = CurrentMode();
+        if (mode is not null)
+        {
+            w = mode.Value.W;
+            h = mode.Value.H;
+        }
+        else
+        {
+            w = _sourceWidth;
+            h = _sourceHeight;
+        }
+
+        if (w <= 0 || h <= 0)
+        {
+            _zoomPending = true; // retry once a frame gives us the source size
+            return "";
+        }
+
+        _zoomPending = false;
+        var cropX = ((int)((w - w / Zoom) / 2)) & ~1;
+        var cropY = ((int)((h - h / Zoom) / 2)) & ~1;
+        if (cropX <= 0 && cropY <= 0)
+            return "";
+
+        return $"videocrop left={cropX} right={cropX} top={cropY} bottom={cropY} ! " +
+               $"videoscale ! video/x-raw,width={w},height={h} ! videoconvert ! ";
+    }
+
     private string PreviewDescription(string effect)
     {
-        var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
-        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+        var rotation = Rotation == "auto" ? "" : $"videoflip video-direction={Rotation} ! ";
+        var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{effect} ! ";
         // A trailing videoconvert lets effects (e.g. frei0r filters) negotiate their
         // preferred format and still bridge to the BGRx caps the appsink needs.
         return
-            $"{SourcePrefix()} ! videoconvert ! {flip}{effectChain} " +
-            "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
+            $"{SourcePrefix()} ! videoconvert ! {ZoomStage()}{rotation}{mirror}{effectChain}" +
+            "videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
     }
 
     private string RecordingDescription(string effect, string path, bool includeAudio)
     {
-        var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
-        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+        var rotation = Rotation == "auto" ? "" : $"videoflip video-direction={Rotation} ! ";
+        var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{effect} ! ";
         // Audio branch: default mic -> optional live mute -> AAC, muxed into the MKV.
         var audio = includeAudio && _audioSource is not null
             ? $" {_audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
@@ -396,7 +446,7 @@ public sealed class GStreamerCaptureService : ICaptureService
         // x264enc's bitrate is in kbit/s.
         var bitrate = _recordQuality switch { "low" => 500, "high" => 5_000, _ => 1_500 };
         return
-            $"{SourcePrefix()} ! videoconvert ! {flip}{effectChain} ! tee name=t " +
+            $"{SourcePrefix()} ! videoconvert ! {ZoomStage()}{rotation}{mirror}{effectChain}tee name=t " +
             "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
             $"t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency bitrate={bitrate} " +
             $"! matroskamux name=mux ! filesink name=filesink location=\"{path}\"{audio}";
@@ -762,7 +812,47 @@ public sealed class GStreamerCaptureService : ICaptureService
         lock (_frameLock)
             _latestFrame = frame;
 
+        // Track the source resolution so a deferred zoom can be applied once it's known.
+        _sourceWidth = width;
+        _sourceHeight = height;
+        MaybeApplyPendingZoom();
+
         FrameReady?.Invoke(this, frame);
+    }
+
+    /// <summary>
+    /// If zoom was requested while the source size was unknown (default resolution),
+    /// rebuild the preview once a frame establishes the size, so the zoom engages.
+    /// </summary>
+    private void MaybeApplyPendingZoom()
+    {
+        if (!_zoomPending || Zoom <= 1.0 || _rebuildingPreview || IsRecording)
+            return;
+        if (_sourceWidth <= 0 || _sourceHeight <= 0)
+            return;
+
+        _zoomPending = false;
+        _rebuildingPreview = true;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                StopPreviewInternal();
+                if (_currentDevice is not null)
+                {
+                    BuildPreviewPipeline();
+                    _previewPipeline?.SetState(Gst.State.Playing);
+                }
+            }
+            catch
+            {
+                // Best-effort; the next rebuild will retry.
+            }
+            finally
+            {
+                _rebuildingPreview = false;
+            }
+        });
     }
 
     // ------------------------------------------------------------------ //

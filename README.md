@@ -17,6 +17,7 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - **Audio in recordings** — captures the default microphone (PipeWire/Pulse/ALSA via `autoaudiosrc`) as AAC, with a **Mic** toggle for live mute (applies even mid-recording)
 - **Resolution / FPS selector** — a per-camera dropdown of the modes the device actually supports (e.g. 1920×1080 @ 30, 1280×720 @ 30, 640×480 @ 30), detected from the device caps. High-res modes use the camera's MJPEG stream + `jpegdec`, since many UVC cams (incl. the C930e) can't do raw 720p/1080p
 - **Record quality + auto-split** — Low/Med/High `x264enc` bitrate, and an optional size cap that splits long recordings into numbered parts (`video_…-1.mkv`, `video_…-2.mkv`) without stopping the preview
+- **Rotation & digital zoom** — 90°/180°/270° rotation (for sideways-mounted cams) and up to 4× smooth digital zoom (crop + `videoscale`), applied to the preview, photos and recordings
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
@@ -131,6 +132,7 @@ v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
 - [x] Resolution / FPS selector (per-camera; MJPEG for high-res modes)
 - [x] Record quality (Low/Med/High) + auto-split at a size cap
 - [x] Countdown self-timer (3 s / 10 s before a photo)
+- [x] Rotation (90°/180°/270°) + digital zoom (up to 4×)
 - [ ] AppStream metainfo + AUR PKGBUILD
 - [ ] i18n
 

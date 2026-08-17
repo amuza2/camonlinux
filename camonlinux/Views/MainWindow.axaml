@@ -44,12 +44,20 @@
                     <ComboBox ItemsSource="{Binding Devices}"
                               SelectedItem="{Binding SelectedDevice}"
                               PlaceholderText="Select a camera"
-                              Width="300"
+                              Width="280"
                               DisplayMemberBinding="{Binding Name}"/>
                     <ComboBox ItemsSource="{Binding Resolutions}"
                               SelectedItem="{Binding SelectedResolution}"
-                              Width="160"
+                              Width="140"
                               ToolTip.Tip="Capture resolution (per camera)"/>
+                    <ComboBox ItemsSource="{Binding RotationOptions}"
+                              SelectedItem="{Binding SelectedRotation}"
+                              Width="70"
+                              ToolTip.Tip="Rotate the image"/>
+                    <ComboBox ItemsSource="{Binding ZoomOptions}"
+                              SelectedItem="{Binding SelectedZoom}"
+                              Width="70"
+                              ToolTip.Tip="Digital zoom"/>
                 </StackPanel>
             </DockPanel>
         </Border>

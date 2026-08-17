@@ -11,5 +11,7 @@ public sealed class AppSettings
     public string RecordQuality { get; set; } = "medium";
     public long MaxFileSizeMB { get; set; }
     public int TimerSeconds { get; set; }
+    public string Rotation { get; set; } = "auto";
+    public double Zoom { get; set; } = 1.0;
     public string? LastDeviceId { get; set; }
 }
