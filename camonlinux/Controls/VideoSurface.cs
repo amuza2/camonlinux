@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -19,8 +20,15 @@ public sealed class VideoSurface : Control
 {
     private readonly object _sync = new();
     private WriteableBitmap? _bitmap;
-    private byte[]? _scratch;
     private static readonly DrawingBrush s_checker = CreateChecker();
+
+    // Bounds the UI-thread frame queue so posted 8 MB frames can't pile up
+    // (prevents unbounded RSS growth when the composite/preview is slow).
+    private const int MaxPending = 2;
+    private const int CompositePoolSize = 3;
+    private int _pending;
+    private readonly byte[][] _compositePool = new byte[CompositePoolSize][];
+    private int _poolIndex;
 
     /// <summary>
     /// When true, the pushed frame's alpha channel is composited in software over a
@@ -29,6 +37,9 @@ public sealed class VideoSurface : Control
     /// their alpha ignored on this platform, so the blend is done here instead.
     /// </summary>
     public bool CompositeAlpha { get; set; }
+
+    /// <summary>True when the UI thread is behind and frames are being dropped.</summary>
+    public bool IsUiBackedUp => _pending >= MaxPending;
 
     private static DrawingBrush CreateChecker()
     {
@@ -62,83 +73,101 @@ public sealed class VideoSurface : Control
         if (frame.Width <= 0 || frame.Height <= 0 || frame.Data.Length == 0)
             return;
 
-        // WriteableBitmap must only be touched on the UI thread.
-        Dispatcher.UIThread.Post(() => UpdateFrame(frame), DispatcherPriority.Render);
+        // Bound the UI queue: if the UI thread can't keep up, drop this frame instead
+        // of letting posted 8 MB buffers pile up (unbounded RSS growth).
+        if (Interlocked.Increment(ref _pending) > MaxPending)
+        {
+            Interlocked.Decrement(ref _pending);
+            return;
+        }
+
+        var source = frame.Data;
+        var w = frame.Width;
+        var h = frame.Height;
+
+        if (CompositeAlpha)
+        {
+            // Composite on the calling (streaming) thread so the UI thread only does
+            // a memcpy. Round-robin a small pool so the UI's async copy isn't
+            // overwritten by a later frame.
+            var idx = _poolIndex = (_poolIndex + 1) % CompositePoolSize;
+            if (_compositePool[idx] is null || _compositePool[idx].Length != source.Length)
+                _compositePool[idx] = new byte[source.Length];
+            var dst = _compositePool[idx];
+            Composite(source, dst, w, h);
+            source = dst;
+        }
+
+        var data = source;
+        Dispatcher.UIThread.Post(() =>
+        {
+            try { UpdateFrame(data, w, h); }
+            finally { Interlocked.Decrement(ref _pending); }
+        }, DispatcherPriority.Render);
     }
 
-    private void UpdateFrame(CameraFrame frame)
+    /// <summary>Blends BGRA <paramref name="src"/> over a checkerboard into opaque <paramref name="dst"/>.</summary>
+    private static void Composite(byte[] src, byte[] dst, int w, int h)
+    {
+        for (var y = 0; y < h; y++)
+        {
+            var row = y * w;
+            for (var x = 0; x < w; x++)
+            {
+                var o = (row + x) * 4;
+                var a = src[o + 3];
+                if (a == 255)
+                {
+                    dst[o] = src[o];
+                    dst[o + 1] = src[o + 1];
+                    dst[o + 2] = src[o + 2];
+                }
+                else
+                {
+                    var (cb, cg, cr) = CheckerColor(x, y);
+                    if (a == 0)
+                    {
+                        dst[o] = cb;
+                        dst[o + 1] = cg;
+                        dst[o + 2] = cr;
+                    }
+                    else
+                    {
+                        var ia = 255 - a;
+                        dst[o] = (byte)((src[o] * a + cb * ia) / 255);
+                        dst[o + 1] = (byte)((src[o + 1] * a + cg * ia) / 255);
+                        dst[o + 2] = (byte)((src[o + 2] * a + cr * ia) / 255);
+                    }
+                }
+                dst[o + 3] = 255;
+            }
+        }
+    }
+
+    private void UpdateFrame(byte[] data, int width, int height)
     {
         lock (_sync)
         {
             if (_bitmap is null
-                || _bitmap.PixelSize.Width != frame.Width
-                || _bitmap.PixelSize.Height != frame.Height)
+                || _bitmap.PixelSize.Width != width
+                || _bitmap.PixelSize.Height != height)
             {
                 _bitmap?.Dispose();
                 _bitmap = new WriteableBitmap(
-                    new PixelSize(frame.Width, frame.Height),
+                    new PixelSize(width, height),
                     new Vector(96, 96),
                     PixelFormats.Bgra8888);
             }
 
             using var framebuffer = _bitmap.Lock();
-            var source = frame.Data;
-
-            if (CompositeAlpha)
+            var rowBytes = Math.Min(framebuffer.RowBytes, width * 4);
+            for (var y = 0; y < height; y++)
             {
-                // Software-composite the video over the checkerboard into an opaque
-                // buffer, so alpha-masked (transparent) regions are visible.
-                var w = frame.Width;
-                var h = frame.Height;
-                if (_scratch is null || _scratch.Length != source.Length)
-                    _scratch = new byte[source.Length];
-                var dst = _scratch;
-                for (var y = 0; y < h; y++)
-                {
-                    var row = y * w;
-                    for (var x = 0; x < w; x++)
-                    {
-                        var o = (row + x) * 4;
-                        var a = source[o + 3];
-                        if (a == 255)
-                        {
-                            dst[o] = source[o];
-                            dst[o + 1] = source[o + 1];
-                            dst[o + 2] = source[o + 2];
-                        }
-                        else
-                        {
-                            var (cb, cg, cr) = CheckerColor(x, y);
-                            if (a == 0)
-                            {
-                                dst[o] = cb;
-                                dst[o + 1] = cg;
-                                dst[o + 2] = cr;
-                            }
-                            else
-                            {
-                                var ia = 255 - a;
-                                dst[o] = (byte)((source[o] * a + cb * ia) / 255);
-                                dst[o + 1] = (byte)((source[o + 1] * a + cg * ia) / 255);
-                                dst[o + 2] = (byte)((source[o + 2] * a + cr * ia) / 255);
-                            }
-                        }
-                        dst[o + 3] = 255;
-                    }
-                }
-                Marshal.Copy(dst, 0, framebuffer.Address, dst.Length);
-            }
-            else
-            {
-                var rowBytes = Math.Min(framebuffer.RowBytes, frame.Stride);
-                for (var y = 0; y < frame.Height; y++)
-                {
-                    Marshal.Copy(
-                        source,
-                        y * frame.Stride,
-                        framebuffer.Address + (y * framebuffer.RowBytes),
-                        rowBytes);
-                }
+                Marshal.Copy(
+                    data,
+                    y * width * 4,
+                    framebuffer.Address + (y * framebuffer.RowBytes),
+                    rowBytes);
             }
         }
 

@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private VirtualCameraService? _virtualCamera;
     private int _lastFrameW;
     private int _lastFrameH;
+    private int _maskFrames;
     private readonly MaskFrame _maskFrame = new();
 
     public MainWindow()
@@ -55,6 +56,17 @@ public partial class MainWindow : Window
 
         capture.FrameReady += (_, frame) =>
         {
+            // If the UI thread is behind on preview updates, skip the expensive mask
+            // work and drop this frame — prevents CPU spikes and unbounded memory.
+            if (VideoSurfaceControl.IsUiBackedUp)
+                return;
+
+            // The mask math is the expensive part (per-pixel over the whole frame).
+            // Cap the processed rate to ~15 fps while masking so CPU stays bounded;
+            // a live preview doesn't need the full capture rate.
+            if (_maskPipeline is { Enabled: true } && (++_maskFrames & 1) != 0)
+                return;
+
             if (_maskPipeline is { Enabled: true } && frame.Data.Length > 0)
             {
                 _maskFrame.Set(frame.Data, frame.Width, frame.Height);

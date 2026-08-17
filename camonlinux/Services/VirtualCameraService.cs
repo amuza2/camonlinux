@@ -26,6 +26,7 @@ public sealed class VirtualCameraService : IDisposable
     private int _fps = 30;
     private int _width;
     private int _height;
+    private long _frameCounter;
 
     public bool IsRunning
     {
@@ -139,6 +140,10 @@ public sealed class VirtualCameraService : IDisposable
     public void PushFrame(byte[] data, int width, int height)
     {
         if (data is null || data.Length == 0)
+            return;
+
+        // Throttle to ~15 fps so we don't memdup an 8 MB buffer at full capture rate.
+        if ((++_frameCounter & 1) != 0)
             return;
 
         AppSrc? src;
