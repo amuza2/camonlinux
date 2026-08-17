@@ -178,8 +178,17 @@ public partial class MainWindowViewModel : ViewModelBase
         // Seed both combos with a valid default item so they always display a
         // selection from the very first render (the item lists are otherwise
         // empty until the async population completes after the window opens).
+        // The resolution list also pre-seeds the saved resolution so the combo
+        // shows it immediately, before the device's supported modes are
+        // enumerated asynchronously.
         Resolutions.Add("Default");
+        if (!string.IsNullOrEmpty(settings.Settings.Resolution) &&
+            !string.Equals(settings.Settings.Resolution, "Default", StringComparison.Ordinal))
+            Resolutions.Add(settings.Settings.Resolution);
         AudioDevices.Add("Default");
+        if (!string.IsNullOrEmpty(settings.Settings.AudioDevice) &&
+            !string.Equals(settings.Settings.AudioDevice, "Default", StringComparison.Ordinal))
+            AudioDevices.Add(settings.Settings.AudioDevice);
         _selectedResolution = string.IsNullOrEmpty(settings.Settings.Resolution) ? "Default" : settings.Settings.Resolution;
         _selectedQuality = MapQualityLabel(settings.Settings.RecordQuality);
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
@@ -422,18 +431,29 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task LoadResolutionsAsync(CameraDevice device)
     {
         var modes = await Task.Run(() => _capture.GetSupportedModes(device));
-        Resolutions.Clear();
-        Resolutions.Add("Default");
-        foreach (var mode in modes)
-            Resolutions.Add(mode);
-
         var saved = _settings.Settings.Resolution;
-        var target = Resolutions.Contains(saved) ? saved : "Default";
-        SelectedResolution = target;
-        // The collection was just cleared and rebuilt, which drops the ComboBox's
-        // internal selection; re-assigning the same value may not raise a change
-        // notification, so force the ComboBox to re-sync with the current items.
-        OnPropertyChanged(nameof(SelectedResolution));
+        var items = new List<string> { "Default" };
+        items.AddRange(modes);
+
+        // Merge the supported modes into the collection WITHOUT clearing it first.
+        // Clear() resets the ComboBox's internal selection (SelectedIndex = -1) and,
+        // because re-assigning the same bound value raises no change notification,
+        // the combo is left blank. Only removing entries that are no longer
+        // supported and appending new ones keeps a still-supported item selected.
+        for (var i = Resolutions.Count - 1; i >= 0; i--)
+        {
+            if (!items.Contains(Resolutions[i]))
+                Resolutions.RemoveAt(i);
+        }
+        foreach (var item in items)
+        {
+            if (!Resolutions.Contains(item))
+                Resolutions.Add(item);
+        }
+
+        var target = items.Contains(saved) ? saved : "Default";
+        if (!string.Equals(SelectedResolution, target, StringComparison.Ordinal))
+            SelectedResolution = target;
     }
 
     partial void OnSelectedDeviceChanged(CameraDevice? value)
@@ -1176,16 +1196,26 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task LoadAudioDevicesAsync()
     {
         var devices = await Task.Run(() => _capture.GetAudioDevices());
-        AudioDevices.Clear();
-        AudioDevices.Add("Default");
-        foreach (var device in devices)
-            AudioDevices.Add(device);
+        var items = new List<string> { "Default" };
+        items.AddRange(devices);
+
+        // Same in-place merge as the resolution list — never clear the collection,
+        // so a still-present device keeps its selection in the ComboBox.
+        for (var i = AudioDevices.Count - 1; i >= 0; i--)
+        {
+            if (!items.Contains(AudioDevices[i]))
+                AudioDevices.RemoveAt(i);
+        }
+        foreach (var item in items)
+        {
+            if (!AudioDevices.Contains(item))
+                AudioDevices.Add(item);
+        }
 
         var saved = _settings.Settings.AudioDevice;
-        SelectedAudioDevice = string.IsNullOrEmpty(saved) ? "Default" : (AudioDevices.Contains(saved) ? saved : "Default");
-        // Force the ComboBox to re-sync after the collection rebuild (the setter
-        // may skip the notification when the value is unchanged).
-        OnPropertyChanged(nameof(SelectedAudioDevice));
+        var target = string.IsNullOrEmpty(saved) ? "Default" : (items.Contains(saved) ? saved : "Default");
+        if (!string.Equals(SelectedAudioDevice, target, StringComparison.Ordinal))
+            SelectedAudioDevice = target;
     }
 
     partial void OnSelectedAudioDeviceChanged(string value)
