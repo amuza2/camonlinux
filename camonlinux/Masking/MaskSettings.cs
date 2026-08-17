@@ -176,3 +176,25 @@ public partial class ChromaKeyMaskSettings : ObservableObject
         SuperKey = false; K = 1; K2 = 1; Veil = 30; Invert = false;
     }
 }
+
+public enum SvgScaleBy { Width, Height, Both }
+
+/// <summary>Parameters for the SVG mask (rasterized via SkiaSharp).</summary>
+public partial class SvgMaskSettings : ObservableObject
+{
+    [ObservableProperty] private string _svgText = "";
+    [ObservableProperty] private SvgScaleBy _scaleBy = SvgScaleBy.Both;
+    [ObservableProperty] private double _width = 640;
+    [ObservableProperty] private double _height = 360;
+    [ObservableProperty] private double _positionX;
+    [ObservableProperty] private double _positionY;
+    [ObservableProperty] private bool _invert;
+
+    public void Reset()
+    {
+        SvgText = "";
+        ScaleBy = SvgScaleBy.Both;
+        Width = 640; Height = 360;
+        PositionX = 0; PositionY = 0; Invert = false;
+    }
+}

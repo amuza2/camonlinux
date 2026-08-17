@@ -24,6 +24,7 @@
                     <ToggleButton IsChecked="{Binding ShapeEnabled}" Content="Shape"/>
                     <ToggleButton IsChecked="{Binding GradientEnabled}" Content="Gradient"/>
                     <ToggleButton IsChecked="{Binding ChromaEnabled}" Content="Chroma"/>
+                    <ToggleButton IsChecked="{Binding SvgEnabled}" Content="SVG"/>
                     <ToggleButton IsChecked="{Binding FeatherEnabled}" Content="Feather"/>
                     <ToggleButton IsChecked="{Binding AdjustmentEnabled}" Content="Adjust"/>
                 </StackPanel>
@@ -242,6 +243,38 @@
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Veil" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                             <Slider Grid.Row="2" Grid.Column="1" Value="{Binding Chroma.Veil}" Minimum="0" Maximum="100" Width="200"/>
                         </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ SVG ============ -->
+            <TabItem Header="SVG">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Margin="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Load SVG file…" Click="OnLoadSvgFile"/>
+                            <TextBlock Text="Paste SVG below, or load a file." Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBox Text="{Binding Svg.SvgText}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 Height="140" FontFamily="monospace" FontSize="11"
+                                 PlaceholderText="&lt;svg …&gt; &lt;path d=&quot;…&quot;/&gt; &lt;/svg&gt;"/>
+                        <ToggleButton IsChecked="{Binding Svg.Invert}" Content="Invert mask"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Scale by" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <ComboBox ItemsSource="{Binding SvgScaleByOptions}" SelectedIndex="{Binding SvgScaleByIndex}" Width="100"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Width" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding Svg.Width}" Width="70"/>
+                            <TextBlock Text="Height" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding Svg.Height}" Width="70"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Pos X" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Svg.PositionX}" Minimum="-1000" Maximum="1000" Width="120"/>
+                            <TextBlock Text="Pos Y" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Svg.PositionY}" Minimum="-1000" Maximum="1000" Width="120"/>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

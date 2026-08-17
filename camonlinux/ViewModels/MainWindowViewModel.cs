@@ -310,21 +310,24 @@ public partial class MainWindowViewModel : ViewModelBase
         var feather = new FeatherMaskSettings();
         var adjustment = new ColorAdjustmentMaskSettings();
         var chroma = new ChromaKeyMaskSettings();
+        var svg = new SvgMaskSettings();
         var pipeline = new MaskPipeline();
         var shapeEffect = new ShapeMaskEffect(shape);
         var gradientEffect = new GradientMaskEffect(gradient);
         var chromaEffect = new ChromaKeyMaskEffect(chroma);
         var featherEffect = new FeatherMaskEffect(feather);
         var adjustmentEffect = new ColorAdjustmentMaskEffect(adjustment);
+        var svgEffect = new SvgMaskEffect(svg);
         pipeline.Effects.Add(shapeEffect);
         pipeline.Effects.Add(gradientEffect);
         pipeline.Effects.Add(chromaEffect);
         pipeline.Effects.Add(featherEffect);
         pipeline.Effects.Add(adjustmentEffect);
+        pipeline.Effects.Add(svgEffect);
         MaskPipeline = pipeline;
         MaskEditor = new MaskEditorViewModel(
-            pipeline, shape, gradient, feather, adjustment, chroma,
-            shapeEffect, gradientEffect, chromaEffect, featherEffect, adjustmentEffect);
+            pipeline, shape, gradient, feather, adjustment, chroma, svg,
+            shapeEffect, gradientEffect, chromaEffect, featherEffect, adjustmentEffect, svgEffect);
 
         // Keep the toolbar Mask toggle and the editor's Enable toggle in sync; the
         // pipeline is only applied when enabled.

@@ -21,12 +21,14 @@ public partial class MaskEditorViewModel : ObservableObject
     public Masking.FeatherMaskSettings Feather { get; }
     public Masking.ColorAdjustmentMaskSettings Adjustment { get; }
     public Masking.ChromaKeyMaskSettings Chroma { get; }
+    public Masking.SvgMaskSettings Svg { get; }
 
     private readonly Masking.IMaskEffect _shapeEffect;
     private readonly Masking.IMaskEffect _gradientEffect;
     private readonly Masking.IMaskEffect _chromaEffect;
     private readonly Masking.IMaskEffect _featherEffect;
     private readonly Masking.IMaskEffect _adjustmentEffect;
+    private readonly Masking.IMaskEffect _svgEffect;
 
     public string[] MaskModeOptions { get; } = { "Alpha Mask", "Adjustment Mask" };
     public string[] ShapeOptions { get; } =
@@ -37,6 +39,9 @@ public partial class MaskEditorViewModel : ObservableObject
     public string[] CornerRadiusTypeOptions { get; } = { "Uniform", "Custom" };
     public string[] FeatherTypeOptions { get; } = { "None", "Inner", "Middle", "Outer" };
     public string[] SuperformulaModeOptions { get; } = { "Squircle", "Superellipse", "General" };
+    public string[] SvgScaleByOptions { get; } = { "Width", "Height", "Both" };
+
+    [ObservableProperty] private int _svgScaleByIndex;
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private int _modeIndex;
@@ -54,6 +59,7 @@ public partial class MaskEditorViewModel : ObservableObject
     [ObservableProperty] private bool _chromaEnabled;
     [ObservableProperty] private bool _featherEnabled;
     [ObservableProperty] private bool _adjustmentEnabled;
+    [ObservableProperty] private bool _svgEnabled;
 
     public MaskEditorViewModel(
         Masking.MaskPipeline pipeline,
@@ -62,11 +68,13 @@ public partial class MaskEditorViewModel : ObservableObject
         Masking.FeatherMaskSettings feather,
         Masking.ColorAdjustmentMaskSettings adjustment,
         Masking.ChromaKeyMaskSettings chroma,
+        Masking.SvgMaskSettings svg,
         Masking.IMaskEffect shapeEffect,
         Masking.IMaskEffect gradientEffect,
         Masking.IMaskEffect chromaEffect,
         Masking.IMaskEffect featherEffect,
-        Masking.IMaskEffect adjustmentEffect)
+        Masking.IMaskEffect adjustmentEffect,
+        Masking.IMaskEffect svgEffect)
     {
         Pipeline = pipeline;
         Shape = shape;
@@ -74,11 +82,13 @@ public partial class MaskEditorViewModel : ObservableObject
         Feather = feather;
         Adjustment = adjustment;
         Chroma = chroma;
+        Svg = svg;
         _shapeEffect = shapeEffect;
         _gradientEffect = gradientEffect;
         _chromaEffect = chromaEffect;
         _featherEffect = featherEffect;
         _adjustmentEffect = adjustmentEffect;
+        _svgEffect = svgEffect;
         _enabled = pipeline.Enabled;
         _modeIndex = pipeline.Mode == Masking.MaskMode.Adjustment ? 1 : 0;
         _invert = pipeline.Invert;
@@ -92,6 +102,8 @@ public partial class MaskEditorViewModel : ObservableObject
         _chromaEnabled = chromaEffect.Enabled;
         _featherEnabled = featherEffect.Enabled;
         _adjustmentEnabled = adjustmentEffect.Enabled;
+        _svgEnabled = svgEffect.Enabled;
+        _svgScaleByIndex = (int)svg.ScaleBy;
         shape.PropertyChanged += OnShapeSettingsChanged;
         RefreshEffectOrder();
     }
@@ -115,6 +127,8 @@ public partial class MaskEditorViewModel : ObservableObject
     partial void OnGradientEnabledChanged(bool value) => _gradientEffect.Enabled = value;
     partial void OnChromaEnabledChanged(bool value) => _chromaEffect.Enabled = value;
     partial void OnFeatherEnabledChanged(bool value) => _featherEffect.Enabled = value;
+    partial void OnSvgEnabledChanged(bool value) => _svgEffect.Enabled = value;
+    partial void OnSvgScaleByIndexChanged(int value) => Svg.ScaleBy = (Masking.SvgScaleBy)value;
 
     partial void OnAdjustmentEnabledChanged(bool value)
     {
