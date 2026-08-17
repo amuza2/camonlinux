@@ -20,24 +20,23 @@ namespace camonlinux.Capture;
 /// <summary>
 /// GStreamer-backed camera service for Linux (V4L2).
 ///
-/// Uses two separate pipelines that never run at the same time (a camera device
-/// can only be opened once):
+/// The live preview and recording are driven by a single pipeline:
 /// <list type="bullet">
 ///   <item>
-///     <description><b>Preview</b>:
-///     <c>v4l2src ! videoconvert ! videoflip ! video/x-raw,format=BGRx ! appsink</c>
+///     <description><b>Preview (idle)</b>:
+///     <c>v4l2src ! videoconvert ! videoflip ! {effect} ! video/x-raw,format=BGRx ! appsink</c>
 ///     — frames are pulled with TryPullSample and published via <see cref="FrameReady"/>.</description>
 ///   </item>
 ///   <item>
-///     <description><b>Recording</b>:
-///     <c>v4l2src ! videoconvert ! videoflip ! x264enc ! matroskamux ! filesink</c>
-///     — the preview is paused while recording and resumes afterwards.</description>
+///     <description><b>Recording</b>: the pipeline is rebuilt to add a tee + record branch
+///     (<c>x264enc ! matroskamux ! filesink</c>) so the <b>live preview keeps running</b> while
+///     recording. Stopping sends EOS down the record branch (finalizing the MKV) and rebuilds
+///     back to the plain preview.</description>
 ///   </item>
 /// </list>
 ///
-/// NOTE: a live preview *while* recording (via a tee) is not used because any
-/// buffer-dropping gate (valve / identity drop-probability) stalls the tee and
-/// freezes the preview branch — see the git history for the investigation.
+/// NOTE: the record branch deliberately has NO buffer-dropping gate — a valve or
+/// identity in drop mode stalls the tee and freezes the preview (see git history).
 /// Requires GStreamer + plugins on the host; see the README.
 /// </summary>
 public sealed class GStreamerCaptureService : ICaptureService
@@ -46,7 +45,8 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     private Element? _previewPipeline;
     private AppSink? _appSink;
-    private Element? _recordPipeline;
+    private Element? _recordQueue;
+    private Element? _recordFileSink;
     private CameraDevice? _currentDevice;
     private CameraFrame? _latestFrame;
     private Gst.Bus? _bus;
@@ -59,7 +59,7 @@ public sealed class GStreamerCaptureService : ICaptureService
     public event EventHandler<string>? ErrorOccurred;
 
     public bool IsPreviewActive => _previewPipeline is not null;
-    public bool IsRecording => _recordPipeline is not null;
+    public bool IsRecording => _recordQueue is not null;
     public bool Mirrored { get; set; } = true;
     public string Effect { get; set; } = "";
     public CameraDevice? CurrentDevice => _currentDevice;
@@ -187,6 +187,8 @@ public sealed class GStreamerCaptureService : ICaptureService
         _previewPipeline?.Dispose();
         _previewPipeline = null;
         _appSink = null;
+        _recordQueue = null;
+        _recordFileSink = null;
 
         DisposeBus();
 
@@ -199,23 +201,37 @@ public sealed class GStreamerCaptureService : ICaptureService
         if (_currentDevice is null)
             return;
 
-        if (TryBuildPreviewPipeline(Effect))
+        if (TryBuildPipeline(PreviewDescription(Effect)))
             return;
 
         // The effect failed to parse (e.g. missing plugin) — fall back to no effect.
         if (!string.IsNullOrWhiteSpace(Effect))
             ErrorOccurred?.Invoke(this, $"The effect '{Effect}' is not available on this system; continuing without it.");
-        TryBuildPreviewPipeline("");
+        TryBuildPipeline(PreviewDescription(""));
     }
 
-    private bool TryBuildPreviewPipeline(string effect)
+    private string PreviewDescription(string effect)
     {
         var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
         var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
-        var description =
+        return
             $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} " +
             "! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
+    }
 
+    private string RecordingDescription(string effect, string path)
+    {
+        var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+        return
+            $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} ! tee name=t " +
+            "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
+            "t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency " +
+            $"! matroskamux ! filesink name=filesink location=\"{path}\"";
+    }
+
+    private bool TryBuildPipeline(string description)
+    {
         try
         {
             _previewPipeline = Gst.Functions.ParseLaunch(description);
@@ -225,6 +241,8 @@ public sealed class GStreamerCaptureService : ICaptureService
             var bin = (Gst.Bin)_previewPipeline;
             _appSink = bin.GetByName("sink") as AppSink
                 ?? throw new InvalidOperationException("Failed to create the preview appsink.");
+            _recordQueue = bin.GetByName("recq");
+            _recordFileSink = bin.GetByName("filesink");
 
             _bus = _previewPipeline.GetBus();
             StartBusWatch();
@@ -302,33 +320,25 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     public Task StartRecordingAsync(string path)
     {
-        if (_recordPipeline is not null)
+        if (_recordQueue is not null)
             return Task.CompletedTask; // already recording
 
         if (_currentDevice is null)
             throw new InvalidOperationException("No camera selected.");
 
-        // A camera device can only be opened once, so stop the preview first.
+        // Rebuild the pipeline to add the recording branch — the preview stays live.
         StopPreviewInternal();
 
-        var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
-        var effectChain = string.IsNullOrWhiteSpace(Effect) ? "" : $" ! {Effect}";
-        var description =
-            $"v4l2src device={_currentDevice.Path} ! videoconvert ! {flip}{effectChain} " +
-            "! x264enc speed-preset=veryfast tune=zerolatency ! matroskamux " +
-            $"! filesink name=filesink location=\"{path}\"";
-
-        try
+        if (TryBuildPipeline(RecordingDescription(Effect, path)))
         {
-            _recordPipeline = Gst.Functions.ParseLaunch(description);
-            _bus = _recordPipeline.GetBus();
-            StartBusWatch();
-            _recordPipeline.SetState(Gst.State.Playing);
+            _previewPipeline?.SetState(Gst.State.Playing);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorOccurred?.Invoke(this, $"Could not start recording: {ex.Message}");
-            StopRecordingPipeline();
+            // Recording branch failed (e.g. missing encoder) — resume plain preview.
+            ErrorOccurred?.Invoke(this, "Could not start recording (missing encoder?); preview continues.");
+            BuildPreviewPipeline();
+            _previewPipeline?.SetState(Gst.State.Playing);
         }
 
         return Task.CompletedTask;
@@ -336,40 +346,34 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     public async Task StopRecordingAsync()
     {
-        var pipeline = _recordPipeline;
-        _recordPipeline = null;
-        if (pipeline is not null)
-        {
-            StopBusWatch();
+        var recordQueue = _recordQueue;
+        if (recordQueue is null)
+            return; // not recording
 
-            // EOS lets x264enc flush and matroskamux write the final container.
-            pipeline.SendEvent(Gst.Event.NewEos());
-            using var bus = pipeline.GetBus();
-            if (bus is not null)
-            {
-                using var _ = bus.TimedPopFiltered(
-                    (Gst.ClockTime)2_000_000_000UL,
-                    Gst.MessageType.Eos | Gst.MessageType.Error);
-            }
-            pipeline.SetState(Gst.State.Null);
-            pipeline.Dispose();
+        StopBusWatch();
+
+        // EOS down the record branch lets x264enc flush and matroskamux write the
+        // final container (the preview branch runs until teardown).
+        var sinkPad = recordQueue.GetStaticPad("sink");
+        sinkPad?.SendEvent(Gst.Event.NewEos());
+
+        // Wait for the muxer to finalize the file.
+        if (_bus is not null)
+        {
+            using var _ = _bus.TimedPopFiltered(
+                (Gst.ClockTime)3_000_000_000UL,
+                Gst.MessageType.Eos | Gst.MessageType.Error);
         }
 
-        DisposeBus();
-
-        // Resume the live preview.
+        // Tear down and resume the plain (idle) preview.
+        StopPreviewInternal();
         if (_currentDevice is not null)
-            StartPreviewInternal(_currentDevice);
+        {
+            BuildPreviewPipeline();
+            _previewPipeline?.SetState(Gst.State.Playing);
+        }
 
         await Task.CompletedTask;
-    }
-
-    private void StopRecordingPipeline()
-    {
-        _recordPipeline?.SetState(Gst.State.Null);
-        _recordPipeline?.Dispose();
-        _recordPipeline = null;
-        DisposeBus();
     }
 
     // ------------------------------------------------------------------ //
@@ -509,14 +513,11 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     public async ValueTask DisposeAsync()
     {
-        if (_recordPipeline is not null)
+        if (_recordQueue is not null)
         {
             StopBusWatch();
-            _recordPipeline?.SendEvent(Gst.Event.NewEos());
-            _recordPipeline?.SetState(Gst.State.Null);
-            _recordPipeline?.Dispose();
-            _recordPipeline = null;
-            DisposeBus();
+            _recordQueue.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
+            _previewPipeline?.SetState(Gst.State.Null);
         }
 
         StopPreviewInternal();

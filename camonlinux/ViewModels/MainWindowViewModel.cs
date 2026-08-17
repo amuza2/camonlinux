@@ -150,6 +150,17 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             await _capture.StartPreviewAsync(device);
             IsPreviewActive = true;
+
+            // If a device switch happened mid-recording, the service tears the
+            // record branch down — keep the VM state in sync.
+            if (!_capture.IsRecording)
+            {
+                IsRecording = false;
+                _recordingTimer?.Dispose();
+                _recordingTimer = null;
+                RecordingTime = "00:00";
+            }
+
             StatusMessage = $"Using {device.Name}";
         }
         catch (Exception ex)

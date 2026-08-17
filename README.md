@@ -92,28 +92,27 @@ camonlinux/
 
 ## How the capture pipeline works
 
-Two separate GStreamer pipelines run at opposite times (a camera device can only
-be opened once):
+A single GStreamer pipeline drives both preview and recording:
 
 ```
-# Preview (always when not recording)
-v4l2src ! videoconvert ! videoflip (mirror) ! video/x-raw,format=BGRx ! appsink
+# Preview (idle)
+v4l2src ! videoconvert ! videoflip (mirror) ! {effect} ! video/x-raw,format=BGRx ! appsink
 
-# Recording (started on demand; preview pauses while recording)
-v4l2src ! videoconvert ! videoflip ! x264enc ! matroskamux ! filesink
+# Recording (pipeline rebuilt with a tee; preview stays LIVE)
+v4l2src ! videoconvert ! videoflip ! {effect} ! tee
+    ├─ queue ! videoconvert ! video/x-raw,format=BGRx ! appsink      → live preview
+    └─ queue ! x264enc ! matroskamux ! filesink                       → MKV recording
 ```
 
-- Frames are pulled from the `appsink` on a background thread
-  (`TryPullSample`) and rendered on the preview `WriteableBitmap`.
-- Recording finalizes the Matroska container by sending EOS, then the live
-  preview automatically resumes.
-- **Known limitation:** the preview pauses while recording (a live preview
-  during recording via a `tee` is blocked by a GStreamer quirk where any
-  buffer-dropping gate stalls the tee — revisit later).
+- Frames are pulled from the `appsink` on a background thread (`TryPullSample`)
+  and rendered on the preview `WriteableBitmap`.
+- Starting a recording rebuilds the pipeline to add the record branch, so the
+  live preview keeps running while recording.
+- Stopping sends EOS down the record branch only — the Matroska container is
+  finalized properly — then rebuilds back to the plain preview.
 
 ## Roadmap / next steps
 
-- [ ] Live preview while recording (tee — needs a working gating strategy)
 - [ ] Device hot-plug detection (poll `/dev/video*` / inotify)
 - [ ] frei0r effects (install `frei0r-plugins` + `gst-plugins-bad`)
 - [ ] Video thumbnails in the gallery (decode a frame via a short GStreamer pipeline)
