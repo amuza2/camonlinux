@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _timerSeconds;
     private int _countdownRemaining;
     private string _photoFormat = "jpeg";
+    private Timer? _cameraControlsDebounce;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
     private Timer? _devicesTimer;
@@ -106,8 +107,17 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _selectedPhotoFormat = "JPEG";
 
-    [ObservableProperty]
+        [ObservableProperty]
     private bool _showTimestamp;
+
+    [ObservableProperty]
+    private int _brightness = 128;
+
+    [ObservableProperty]
+    private int _contrast = 128;
+
+    [ObservableProperty]
+    private int _saturation = 128;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -143,10 +153,16 @@ public partial class MainWindowViewModel : ViewModelBase
         _photoFormat = settings.Settings.PhotoFormat;
         _selectedPhotoFormat = _photoFormat == "png" ? "PNG" : "JPEG";
         _showTimestamp = settings.Settings.ShowTimestamp;
+        _brightness = settings.Settings.Brightness;
+        _contrast = settings.Settings.Contrast;
+        _saturation = settings.Settings.Saturation;
         _capture.Rotation = settings.Settings.Rotation;
         _capture.Zoom = settings.Settings.Zoom;
         _capture.PhotoFormat = settings.Settings.PhotoFormat;
         _capture.ShowTimestamp = settings.Settings.ShowTimestamp;
+        _capture.Brightness = settings.Settings.Brightness;
+        _capture.Contrast = settings.Settings.Contrast;
+        _capture.Saturation = settings.Settings.Saturation;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -461,6 +477,35 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.ShowTimestamp = value;
         _settings.Save();
         _capture.ShowTimestamp = value;
+    }
+
+    partial void OnBrightnessChanged(int value) => CameraControlsChanged();
+
+    partial void OnContrastChanged(int value) => CameraControlsChanged();
+
+    partial void OnSaturationChanged(int value) => CameraControlsChanged();
+
+    /// <summary>
+    /// Persists the camera controls and applies them live (debounced so dragging a
+    /// slider doesn't spawn a v4l2-ctl per tick).
+    /// </summary>
+    private void CameraControlsChanged()
+    {
+        _settings.Settings.Brightness = Brightness;
+        _settings.Settings.Contrast = Contrast;
+        _settings.Settings.Saturation = Saturation;
+        _settings.Save();
+
+        _capture.Brightness = Brightness;
+        _capture.Contrast = Contrast;
+        _capture.Saturation = Saturation;
+
+        _cameraControlsDebounce?.Dispose();
+        _cameraControlsDebounce = new Timer(
+            _ => Dispatcher.UIThread.Post(() => _capture.ApplyCameraControls()),
+            null,
+            TimeSpan.FromMilliseconds(150),
+            TimeSpan.FromMilliseconds(-1));
     }
 
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };

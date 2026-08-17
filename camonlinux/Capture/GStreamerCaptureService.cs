@@ -130,6 +130,15 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
     public bool ShowTimestamp { get; set; }
+
+    /// <summary>v4l2 brightness control (0-255, 128 = default).</summary>
+    public int Brightness { get; set; } = 128;
+
+    /// <summary>v4l2 contrast control (0-255, 128 = default).</summary>
+    public int Contrast { get; set; } = 128;
+
+    /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
+    public int Saturation { get; set; } = 128;
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -349,6 +358,40 @@ public sealed class GStreamerCaptureService : ICaptureService
         StopPreviewInternal();
         BuildPreviewPipeline();
         _previewPipeline?.SetState(Gst.State.Playing);
+        ApplyCameraControls();
+    }
+
+    /// <summary>
+    /// Applies the brightness/contrast/saturation controls to the current camera
+    /// via v4l2-ctl (applied to the hardware directly, so it works live without
+    /// rebuilding the pipeline). Best-effort; silently ignored when v4l2-ctl is
+    /// missing or a control isn't supported.
+    /// </summary>
+    public void ApplyCameraControls()
+    {
+        var device = _currentDevice?.Path;
+        if (device is null)
+            return;
+        RunV4l2Ctl(device, $"brightness={Brightness},contrast={Contrast},saturation={Saturation}");
+    }
+
+    private static void RunV4l2Ctl(string device, string args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("v4l2-ctl", $"-d {device} --set-ctrl {args}")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            using var process = Process.Start(psi);
+            process?.WaitForExit(2000);
+        }
+        catch
+        {
+            // Control setting is best-effort.
+        }
     }
 
     private void StopPreviewInternal()

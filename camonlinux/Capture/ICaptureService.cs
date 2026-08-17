@@ -46,6 +46,18 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
     bool ShowTimestamp { get; set; }
 
+    /// <summary>v4l2 brightness control (0-255, 128 = default).</summary>
+    int Brightness { get; set; }
+
+    /// <summary>v4l2 contrast control (0-255, 128 = default).</summary>
+    int Contrast { get; set; }
+
+    /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
+    int Saturation { get; set; }
+
+    /// <summary>Applies the current camera controls live via v4l2-ctl.</summary>
+    void ApplyCameraControls();
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 

@@ -17,6 +17,9 @@ public sealed class AppSettings
     public double Zoom { get; set; } = 1.0;
     public string PhotoFormat { get; set; } = "jpeg";
     public bool ShowTimestamp { get; set; }
+    public int Brightness { get; set; } = 128;
+    public int Contrast { get; set; } = 128;
+    public int Saturation { get; set; } = 128;
     public List<string> FavoriteEffects { get; set; } = new();
     public string? LastDeviceId { get; set; }
 }
