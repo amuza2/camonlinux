@@ -6,6 +6,10 @@ namespace camonlinux.Views;
 
 public partial class RenameDialog : Window
 {
+    public RenameDialog() : this("")
+    {
+    }
+
     public RenameDialog(string currentBaseName)
     {
         InitializeComponent();

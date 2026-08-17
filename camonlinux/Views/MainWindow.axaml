@@ -166,7 +166,7 @@
                             Width="220"/>
                 </StackPanel>
 
-                <TextBox DockPanel.Dock="Top" Margin="8,0,8,4" Watermark="Search effects…"
+                <TextBox DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search effects…"
                          Text="{Binding EffectFilter}" IsVisible="{Binding ShowEffectsPanel}"/>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"

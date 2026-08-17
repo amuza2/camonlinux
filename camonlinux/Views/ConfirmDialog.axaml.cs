@@ -6,6 +6,10 @@ namespace camonlinux.Views;
 
 public partial class ConfirmDialog : Window
 {
+    public ConfirmDialog() : this("", "")
+    {
+    }
+
     public ConfirmDialog(string title, string message)
     {
         InitializeComponent();

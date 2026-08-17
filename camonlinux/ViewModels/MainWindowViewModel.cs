@@ -365,7 +365,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void RefreshFilteredEffects()
     {
-        var filter = _effectFilter?.Trim() ?? "";
+        var filter = EffectFilter?.Trim() ?? "";
         FilteredEffects.Clear();
         foreach (var effect in Effects)
         {

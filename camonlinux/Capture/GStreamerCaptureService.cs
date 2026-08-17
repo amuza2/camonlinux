@@ -530,6 +530,7 @@ public sealed class GStreamerCaptureService : ICaptureService
                 .Where(line => !line.Contains(".monitor", StringComparison.OrdinalIgnoreCase))
                 .Select(line => line.Split('\t').Skip(1).FirstOrDefault())
                 .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s!)
                 .Distinct()
                 .ToList();
         }
@@ -744,28 +745,21 @@ public sealed class GStreamerCaptureService : ICaptureService
         {
             using var canvas = new SKCanvas(bitmap);
             var fontSize = Math.Max(16f, frame.Height / 24f);
-            using var textPaint = new SKPaint
-            {
-                Color = SKColors.White,
-                TextSize = fontSize,
-                IsAntialias = true,
-                FakeBoldText = true,
-                Typeface = SKTypeface.FromFamilyName("monospace")
-            };
+            using var typeface = SKTypeface.FromFamilyName("monospace");
+            using var font = new SKFont(typeface, fontSize) { Embolden = true };
             var text = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var x = frame.Width - 8 - textPaint.MeasureText(text);
+            var x = frame.Width - 8 - font.MeasureText(text);
             var y = frame.Height - 8;
+            using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
             using var outline = new SKPaint
             {
                 Color = SKColors.Black,
-                TextSize = fontSize,
                 IsAntialias = true,
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = 3f,
-                Typeface = textPaint.Typeface
+                StrokeWidth = 3f
             };
-            canvas.DrawText(text, x, y, outline);
-            canvas.DrawText(text, x, y, textPaint);
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, outline);
+            canvas.DrawText(text, x, y, SKTextAlign.Left, font, fill);
         }
 
         using var image = SKImage.FromBitmap(bitmap);

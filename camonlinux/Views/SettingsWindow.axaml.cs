@@ -8,6 +8,10 @@ namespace camonlinux.Views;
 
 public partial class SettingsWindow : Window
 {
+    public SettingsWindow() : this("", "")
+    {
+    }
+
     public SettingsWindow(string photoDirectory, string videoDirectory)
     {
         InitializeComponent();

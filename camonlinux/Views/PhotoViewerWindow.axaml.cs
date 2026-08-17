@@ -15,15 +15,20 @@ namespace camonlinux.Views;
 /// </summary>
 public partial class PhotoViewerWindow : Window
 {
-    private readonly Bitmap _bitmap;
+    private readonly Bitmap? _bitmap;
     private double _zoom = 1.0;
     private bool _dragging;
     private Point _dragStart;
     private Vector _scrollStart;
 
-    public PhotoViewerWindow(string path)
+    /// <summary>Parameterless ctor exists for the XAML resource loader; the path ctor is used in practice.</summary>
+    public PhotoViewerWindow()
     {
         InitializeComponent();
+    }
+
+    public PhotoViewerWindow(string path) : this()
+    {
         _bitmap = new Bitmap(path);
         Photo.Source = _bitmap;
         TitleText.Text = System.IO.Path.GetFileName(path);
@@ -75,6 +80,8 @@ public partial class PhotoViewerWindow : Window
 
     private void AdjustZoomTo(double target)
     {
+        if (_bitmap is null)
+            return;
         // Remember where the viewport centre is (as a fraction of the current extent).
         var cx = Scroller.Offset.X + Scroller.Viewport.Width / 2;
         var cy = Scroller.Offset.Y + Scroller.Viewport.Height / 2;
@@ -92,6 +99,8 @@ public partial class PhotoViewerWindow : Window
 
     private void FitToWindow()
     {
+        if (_bitmap is null)
+            return;
         var w = Math.Max(1.0, Scroller.Viewport.Width);
         var h = Math.Max(1.0, Scroller.Viewport.Height);
         var scale = Math.Min(w / _bitmap.PixelSize.Width, h / _bitmap.PixelSize.Height);
@@ -102,6 +111,8 @@ public partial class PhotoViewerWindow : Window
 
     private void ApplyZoom()
     {
+        if (_bitmap is null)
+            return;
         Photo.Width = _bitmap.PixelSize.Width * _zoom;
         Photo.Height = _bitmap.PixelSize.Height * _zoom;
     }
