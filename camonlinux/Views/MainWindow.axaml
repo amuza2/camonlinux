@@ -281,24 +281,26 @@
                 <!-- Photo mode controls -->
                 <StackPanel Orientation="Horizontal" Spacing="14" IsVisible="{Binding !IsVideoMode}">
                     <Button Content="Take Photo" Command="{Binding TakePhotoCommand}"
-                            FontSize="15" Padding="20,8"/>
+                            FontSize="15" Padding="20,8" VerticalAlignment="Center"/>
                     <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
-                            FontSize="15" Padding="20,8"/>
+                            FontSize="15" Padding="20,8" VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Timer" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}" Width="74"/>
+                        <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}"
+                                  Width="74" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Format" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}" Width="68"/>
+                        <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}"
+                                  Width="68" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Video mode controls -->
                 <StackPanel Orientation="Horizontal" Spacing="14" IsVisible="{Binding IsVideoMode}">
-                    <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
-                            FontSize="15" Padding="20,8"/>
-                    <ToggleButton IsChecked="{Binding MicEnabled}"
+                    <Button Content="{Binding RecordButtonText}" Command="{Binding ToggleRecordingCommand}"
+                            FontSize="15" Padding="20,8" VerticalAlignment="Center"/>
+                    <ToggleButton IsChecked="{Binding MicEnabled}" VerticalAlignment="Center"
                                   ToolTip.Tip="Record audio from the microphone">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="&#x1F3A4;"/>
@@ -307,15 +309,18 @@
                     </ToggleButton>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Audio" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}" Width="180"/>
+                        <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"
+                                  Width="180" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Quality" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}" Width="86"/>
+                        <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}"
+                                  Width="86" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Max size" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}" Width="96"/>
+                        <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}"
+                                  Width="96" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>

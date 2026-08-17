@@ -84,6 +84,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isPreviewActive;
 
     [ObservableProperty] private bool _isRecording;
+
+    /// <summary>The Record button label: "Stop" while recording, "Record" otherwise.</summary>
+    public string RecordButtonText => IsRecording ? "Stop" : "Record";
+
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = "Ready";
     [ObservableProperty] private string _recordingTime = "00:00";
