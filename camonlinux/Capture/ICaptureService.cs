@@ -42,4 +42,10 @@ public interface ICaptureService : IAsyncDisposable
     /// null if the effect could not be built (e.g. missing plugin).
     /// </summary>
     Task<string?> RenderEffectThumbnailAsync(string effect, string sampleImagePath, string outputPath, int width, int height);
+
+    /// <summary>
+    /// True if the named GStreamer element (e.g. <c>frei0r.cartoon</c>) is
+    /// registered on this system. Used to hide effects whose plugin is missing.
+    /// </summary>
+    bool IsElementAvailable(string elementName);
 }

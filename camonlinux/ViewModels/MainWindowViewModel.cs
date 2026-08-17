@@ -110,6 +110,38 @@ public partial class MainWindowViewModel : ViewModelBase
         Effects.Add(new EffectOption("grayscale", "Grayscale", "videobalance saturation=0"));
         Effects.Add(new EffectOption("vivid", "Vivid", "videobalance saturation=1.5"));
         Effects.Add(new EffectOption("agingtv", "Aging TV", "videobalance saturation=0 ! agingtv"));
+
+        // frei0r filters (shipped by frei0r-plugins + gst-plugins-bad). They are
+        // only added when the plugin is actually installed, so the gallery doesn't
+        // show effects that would silently fall back.
+        AddEffectsIfAvailable(
+            new EffectOption("frei0r.cartoon", "Cartoon", "frei0r.cartoon"),
+            new EffectOption("frei0r.edgeglow", "Edge Glow", "frei0r.edgeglow"),
+            new EffectOption("frei0r.invert0r", "Invert", "frei0r.invert0r"),
+            new EffectOption("frei0r.kmeans", "Posterize", "frei0r.k-means"),
+            new EffectOption("frei0r.night", "Night Vision", "frei0r.night"),
+            new EffectOption("frei0r.pixeliz0r", "Pixelate", "frei0r.pixeliz0r"),
+            new EffectOption("frei0r.sketch0r", "Sketch", "frei0r.sketch0r"),
+            new EffectOption("frei0r.vertigo", "Vertigo", "frei0r.vertigo"),
+            new EffectOption("frei0r.vignette", "Vignette", "frei0r.vignette"),
+            new EffectOption("frei0r.bigbrother", "CCTV", "frei0r.bigbrother"),
+            new EffectOption("frei0r.bulge", "Bulge FX", "frei0r.bulge"),
+            new EffectOption("frei0r.infrared", "Infrared", "frei0r.infrared"),
+            new EffectOption("frei0r.emboss", "Emboss", "frei0r.emboss"),
+            new EffectOption("frei0r.sobel", "Sobel", "frei0r.sobel"),
+            new EffectOption("frei0r.solarize", "Solarize", "frei0r.solarize"));
+    }
+
+    /// <summary>Adds effects only if their first pipeline element is available on this system.</summary>
+    private void AddEffectsIfAvailable(params EffectOption[] effects)
+    {
+        foreach (var effect in effects)
+        {
+            // The filter may be a compound chain; the first element is the gate.
+            var elementName = effect.Filter.Split('!')[0].Trim().Split(' ')[0].Trim();
+            if (_capture.IsElementAvailable(elementName))
+                Effects.Add(effect);
+        }
     }
 
     // ------------------------------------------------------------------ //

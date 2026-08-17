@@ -100,6 +100,21 @@ public sealed class GStreamerCaptureService : ICaptureService
         return Task.CompletedTask;
     }
 
+    public bool IsElementAvailable(string elementName)
+    {
+        if (string.IsNullOrWhiteSpace(elementName))
+            return true;
+
+        try
+        {
+            return Gst.ElementFactory.Find(elementName) is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public System.Threading.Tasks.Task<IReadOnlyList<CameraDevice>> RefreshDevicesAsync()
     {
         _devices.Clear();
@@ -214,9 +229,11 @@ public sealed class GStreamerCaptureService : ICaptureService
     {
         var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
         var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+        // A trailing videoconvert lets effects (e.g. frei0r filters) negotiate their
+        // preferred format and still bridge to the BGRx caps the appsink needs.
         return
             $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} " +
-            "! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
+            "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
     }
 
     private string RecordingDescription(string effect, string path)
