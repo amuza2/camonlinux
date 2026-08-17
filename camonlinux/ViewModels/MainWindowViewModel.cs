@@ -909,6 +909,7 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             await _capture.TakePhotoAsync(path);
+            ShutterSound.Play(); // camera-like shutter click (Kamoso-style)
             StatusMessage = $"Photo saved to {Path.GetFileName(path)}";
             ShowToast($"Photo saved to {Path.GetFileName(path)}");
             NotificationService.Notify("Photo taken", Path.GetFileName(path));
