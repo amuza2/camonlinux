@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using camonlinux.Capture;
 using camonlinux.Models;
@@ -22,6 +23,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stopwatch _recordingStopwatch = new();
     private Timer? _recordingTimer;
     private Timer? _burstTimer;
+    private string? _sampleImagePath;
 
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
@@ -186,6 +188,52 @@ public partial class MainWindowViewModel : ViewModelBase
         // (Not while recording — it applies when the preview resumes.)
         if (IsPreviewActive && !IsRecording && SelectedDevice is not null)
             _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    partial void OnShowEffectsPanelChanged(bool value)
+    {
+        if (value)
+            _ = GenerateEffectThumbnailsAsync();
+    }
+
+    /// <summary>Renders a small live preview of every effect from a camera frame.</summary>
+    private async Task GenerateEffectThumbnailsAsync()
+    {
+        // Grab a sample frame to render every effect through.
+        if (_sampleImagePath is null || !File.Exists(_sampleImagePath))
+        {
+            try
+            {
+                _sampleImagePath = Path.Combine(Path.GetTempPath(), $"camonlinux_sample_{Guid.NewGuid():N}.jpg");
+                await _capture.TakePhotoAsync(_sampleImagePath);
+            }
+            catch
+            {
+                return; // no frame available (e.g. preview not running)
+            }
+        }
+
+        var thumbDir = Path.Combine(Path.GetTempPath(), "camonlinux_effects");
+        Directory.CreateDirectory(thumbDir);
+
+        foreach (var effect in Effects)
+        {
+            if (effect.Thumbnail is not null)
+                continue; // already generated
+
+            var output = Path.Combine(thumbDir, $"{effect.Id}.png");
+            var rendered = await Task.Run(() =>
+                _capture.RenderEffectThumbnailAsync(effect.Filter, _sampleImagePath!, output, 100, 56));
+
+            if (rendered is not null)
+            {
+                var path = rendered;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    try { effect.Thumbnail = new Bitmap(path); } catch { /* ignore */ }
+                });
+            }
+        }
     }
 
     // ------------------------------------------------------------------ //

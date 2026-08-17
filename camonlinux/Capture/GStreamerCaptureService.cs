@@ -258,6 +258,44 @@ public sealed class GStreamerCaptureService : ICaptureService
         return Task.CompletedTask;
     }
 
+    public System.Threading.Tasks.Task<string?> RenderEffectThumbnailAsync(string effect, string sampleImagePath, string outputPath, int width, int height)
+    {
+        try
+        {
+            // Run a short one-shot pipeline: sample image -> effect -> scaled PNG.
+            var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+            var description =
+                $"filesrc location=\"{sampleImagePath}\" ! decodebin ! videoconvert{effectChain} " +
+                // Normalize the effect output, scale, then convert to PNG format.
+                // (Do NOT force format in the same caps as width/height — that breaks
+                // negotiation for effects like agingtv that emit a different format.)
+                $"! videoconvert ! videoscale ! video/x-raw,width={width},height={height} " +
+                $"! videoconvert ! pngenc ! filesink location=\"{outputPath}\"";
+
+            var pipeline = Gst.Functions.ParseLaunch(description);
+            if (pipeline is null)
+                return Task.FromResult<string?>(null);
+
+            pipeline.SetState(Gst.State.Playing);
+            using var bus = pipeline.GetBus();
+            if (bus is not null)
+            {
+                using var _ = bus.TimedPopFiltered(
+                    (Gst.ClockTime)8_000_000_000UL,
+                    Gst.MessageType.Eos | Gst.MessageType.Error);
+            }
+            pipeline.SetState(Gst.State.Null);
+            pipeline.Dispose();
+
+            return Task.FromResult<string?>(
+                File.Exists(outputPath) && new FileInfo(outputPath).Length > 0 ? outputPath : null);
+        }
+        catch
+        {
+            return Task.FromResult<string?>(null);
+        }
+    }
+
     // ------------------------------------------------------------------ //
     // Recording
     // ------------------------------------------------------------------ //

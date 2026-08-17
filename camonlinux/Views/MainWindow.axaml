@@ -66,9 +66,22 @@
                          SelectedItem="{Binding SelectedEffect}"
                          IsVisible="{Binding ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:EffectOption">
-                            <TextBlock Text="{Binding Name}" Margin="6,3"/>
+                            <Border CornerRadius="4" Margin="3" Background="#40000000"
+                                    BorderBrush="#33FFFFFF" BorderThickness="1">
+                                <StackPanel>
+                                    <Image Source="{Binding Thumbnail}" Width="100" Height="56"
+                                           Stretch="UniformToFill"/>
+                                    <TextBlock Text="{Binding Name}" HorizontalAlignment="Center"
+                                               FontSize="12" Margin="0,2"/>
+                                </StackPanel>
+                            </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

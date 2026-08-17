@@ -35,4 +35,11 @@ public interface ICaptureService : IAsyncDisposable
     Task TakePhotoAsync(string path);
     Task StartRecordingAsync(string path);
     Task StopRecordingAsync();
+
+    /// <summary>
+    /// Renders a small preview image of the given GStreamer effect applied to
+    /// <paramref name="sampleImagePath"/>. Returns the output path on success, or
+    /// null if the effect could not be built (e.g. missing plugin).
+    /// </summary>
+    Task<string?> RenderEffectThumbnailAsync(string effect, string sampleImagePath, string outputPath, int width, int height);
 }
