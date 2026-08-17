@@ -8,19 +8,25 @@ namespace camonlinux.Views;
 
 public partial class SettingsWindow : Window
 {
-    public SettingsWindow() : this("", "")
+    public SettingsWindow() : this("", "", "2.5 s", "Unlimited")
     {
     }
 
-    public SettingsWindow(string photoDirectory, string videoDirectory)
+    public SettingsWindow(string photoDirectory, string videoDirectory, string burstInterval, string burstCount)
     {
         InitializeComponent();
         PhotoDirBox.Text = photoDirectory;
         VideoDirBox.Text = videoDirectory;
+        BurstIntervalBox.ItemsSource = new[] { "1 s", "2.5 s", "5 s" };
+        BurstCountBox.ItemsSource = new[] { "Unlimited", "5", "10", "20" };
+        BurstIntervalBox.SelectedItem = burstInterval;
+        BurstCountBox.SelectedItem = burstCount;
     }
 
     public string PhotoDirectory => PhotoDirBox.Text ?? "";
     public string VideoDirectory => VideoDirBox.Text ?? "";
+    public string BurstInterval => BurstIntervalBox.SelectedItem as string ?? "2.5 s";
+    public string BurstCount => BurstCountBox.SelectedItem as string ?? "Unlimited";
 
     private async void OnBrowsePhoto(object? sender, RoutedEventArgs e) => await BrowseAsync(PhotoDirBox);
 

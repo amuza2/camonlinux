@@ -61,8 +61,6 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RotationOptions { get; } = new() { "0°", "90°", "180°", "270°" };
     public ObservableCollection<string> ZoomOptions { get; } = new() { "1×", "1.5×", "2×", "3×", "4×" };
     public ObservableCollection<string> PhotoFormatOptions { get; } = new() { "JPEG", "PNG" };
-    public ObservableCollection<string> BurstIntervalOptions { get; } = new() { "1 s", "2.5 s", "5 s" };
-    public ObservableCollection<string> BurstCountOptions { get; } = new() { "Unlimited", "5", "10", "20" };
     public ObservableCollection<string> AudioDevices { get; } = new();
     public ObservableCollection<EffectOption> FilteredEffects { get; } = new();
 
@@ -215,6 +213,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private string _selectedBurstInterval = "2.5 s";
     [ObservableProperty] private string _selectedBurstCount = "Unlimited";
     [ObservableProperty] private string _busyText = "Working…";
+    [ObservableProperty] private bool _isVideoMode;
 
     public MainWindowViewModel(
         ICaptureService capture,
@@ -249,6 +248,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _burstCount = settings.Settings.BurstPhotoCount;
         _selectedBurstInterval = MapBurstIntervalLabel(_burstIntervalSeconds);
         _selectedBurstCount = _burstCount == 0 ? "Unlimited" : _burstCount.ToString();
+        _isVideoMode = settings.Settings.IsVideoMode;
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
@@ -621,6 +621,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _burstCount = value switch { "5" => 5, "10" => 10, "20" => 20, _ => 0 };
         _settings.Settings.BurstPhotoCount = _burstCount;
+        _settings.Save();
+    }
+
+    partial void OnIsVideoModeChanged(bool value)
+    {
+        _settings.Settings.IsVideoMode = value;
         _settings.Save();
     }
 
@@ -1667,13 +1673,16 @@ public partial class MainWindowViewModel : ViewModelBase
         if (owner is null)
             return;
 
-        var dialog = new SettingsWindow(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
+        var dialog = new SettingsWindow(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory,
+            SelectedBurstInterval, SelectedBurstCount);
         var saved = await dialog.ShowDialog<bool>(owner);
         if (!saved)
             return;
 
         _settings.Settings.PhotoDirectory = dialog.PhotoDirectory;
         _settings.Settings.VideoDirectory = dialog.VideoDirectory;
+        SelectedBurstInterval = dialog.BurstInterval; // persists via handler
+        SelectedBurstCount = dialog.BurstCount;       // persists via handler
         _settings.Save();
         _mediaLibrary.Watch(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
         RefreshGallery();

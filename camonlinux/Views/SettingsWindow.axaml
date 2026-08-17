@@ -18,7 +18,13 @@
             <TextBox x:Name="VideoDirBox" IsReadOnly="True"/>
         </DockPanel>
 
-        <TextBlock Text="Other options (resolution, timer, quality, format, zoom, …) are in the main window." 
+        <TextBlock Text="Burst" FontWeight="SemiBold"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <ComboBox x:Name="BurstIntervalBox" Width="90" ToolTip.Tip="Time between burst photos"/>
+            <ComboBox x:Name="BurstCountBox" Width="130" ToolTip.Tip="Number of burst photos (Unlimited = until stopped)"/>
+        </StackPanel>
+
+        <TextBlock Text="Other options (resolution, timer, quality, format, zoom, camera controls, …) are in the main window." 
                    Foreground="#999999" FontSize="12" TextWrapping="Wrap"/>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">

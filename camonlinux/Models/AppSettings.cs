@@ -15,6 +15,7 @@ public sealed class AppSettings
     public int TimerSeconds { get; set; }
     public double BurstIntervalSeconds { get; set; } = 2.5;
     public int BurstPhotoCount { get; set; }
+    public bool IsVideoMode { get; set; }
     public string Rotation { get; set; } = "auto";
     public double Zoom { get; set; } = 1.0;
     public string PhotoFormat { get; set; } = "jpeg";
