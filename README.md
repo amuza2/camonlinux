@@ -9,19 +9,22 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 ## Features (MVP)
 
 - Live webcam preview (GStreamer `v4l2src` → `appsink`, rendered on a `WriteableBitmap`)
-- Take photos (JPEG, saved to `~/Pictures`)
+- Take photos (JPEG or PNG, saved to `~/Pictures`) with a **white screen flash** on capture
 - **Burst mode** — take a photo every 2.5 s
 - **Countdown self-timer** — 3 s / 10 s countdown before a photo (Kamoso-style), with a big on-screen counter; clicking again cancels
-- **Effects gallery** — 25 built-in GStreamer effects plus up to 17 **frei0r** filters (cartoon, posterize, pixelate, RGB split, glitch, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame
+- **Effects gallery** — 25 built-in GStreamer effects plus up to 17 **frei0r** filters (cartoon, posterize, pixelate, RGB split, glitch, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame; **favorite** effects pin to the top (★), and parameterized effects (**Vivid**, **Grayscale**) have an **intensity slider**
 - Record videos (H.264 + AAC, Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
 - **Audio in recordings** — captures the default microphone (PipeWire/Pulse/ALSA via `autoaudiosrc`) as AAC, with a **Mic** toggle for live mute (applies even mid-recording)
 - **Resolution / FPS selector** — a per-camera dropdown of the modes the device actually supports (e.g. 1920×1080 @ 30, 1280×720 @ 30, 640×480 @ 30), detected from the device caps. High-res modes use the camera's MJPEG stream + `jpegdec`, since many UVC cams (incl. the C930e) can't do raw 720p/1080p
 - **Record quality + auto-split** — Low/Med/High `x264enc` bitrate, and an optional size cap that splits long recordings into numbered parts (`video_…-1.mkv`, `video_…-2.mkv`) without stopping the preview
 - **Rotation & digital zoom** — 90°/180°/270° rotation (for sideways-mounted cams) and up to 4× smooth digital zoom (crop + `videoscale`), applied to the preview, photos and recordings
+- **Live camera controls** — brightness / contrast / saturation sliders that set the v4l2 controls instantly via `v4l2-ctl` (no pipeline rebuild); values persist
+- **Timestamp overlay** — a **Stamp** toggle burns the date & time into the corner of photos (SkiaSharp) and recordings (`textoverlay`)
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
-- Recent captures gallery with **photo & video thumbnails** and delete (moves to trash)
+- Recent captures gallery with **photo & video thumbnails**, **play videos** (system player), **copy / move / rename / delete**, plus a **settings window** (⚙) to pick the photo & video folders
+- **Single-instance guard** — a second launch notifies and exits instead of fighting over the camera
 - Desktop notifications (`notify-send`)
 - Settings persisted to `~/.config/camonlinux/settings.json`
 
