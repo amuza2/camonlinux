@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using System;
+using System.Threading;
 using camonlinux.Capture;
 using camonlinux.Services;
 using camonlinux.ViewModels;
@@ -10,6 +12,8 @@ namespace camonlinux;
 
 public partial class App : Application
 {
+    private static Mutex? s_singleInstanceMutex;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -19,6 +23,16 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Only one instance may use the camera at a time.
+            s_singleInstanceMutex = new Mutex(true, "camonlinux_single_instance", out var createdNew);
+            if (!createdNew)
+            {
+                try { NotificationService.Notify("camonlinux", "camonlinux is already running."); }
+                catch { /* notification is best-effort */ }
+                Environment.Exit(0);
+                return;
+            }
+
             // Compose the app's services (a simple manual composition root —
             // no DI container needed for an app this size).
             var settings = new SettingsService();
