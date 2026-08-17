@@ -37,6 +37,8 @@
                     <StackPanel Spacing="8" Margin="8">
                         <ComboBox ItemsSource="{Binding ShapeOptions}" SelectedIndex="{Binding ShapeIndex}" HorizontalAlignment="Stretch"/>
 
+                        <ToggleButton IsChecked="{Binding Shape.Invert}" Content="Invert mask"/>
+
                         <TextBlock Text="Position / Scale" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
                             <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6">
@@ -227,6 +229,19 @@
                             <TextBlock Text="Gamma" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                             <Slider Value="{Binding Chroma.Gamma}" Minimum="50" Maximum="150" Width="200"/>
                         </StackPanel>
+
+                        <ToggleButton IsChecked="{Binding Chroma.Invert}" Content="Invert mask"/>
+
+                        <TextBlock Text="Super Key (experimental)" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <ToggleButton IsChecked="{Binding Chroma.SuperKey}" Content="Enable Super Key"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="6" IsVisible="{Binding Chroma.SuperKey}">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="K" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="0" Grid.Column="1" Value="{Binding Chroma.K}" Minimum="0.05" Maximum="4" Width="200"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="K2" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="1" Grid.Column="1" Value="{Binding Chroma.K2}" Minimum="0.05" Maximum="4" Width="200"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Veil" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="2" Grid.Column="1" Value="{Binding Chroma.Veil}" Minimum="0" Maximum="100" Width="200"/>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -267,5 +282,23 @@
                 </ScrollViewer>
             </TabItem>
         </TabControl>
+
+        <!-- Effect ordering: the pipeline applies effects top-to-bottom. -->
+        <Border DockPanel.Dock="Bottom" Padding="10,8" Background="#202020">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Effect order (applied top → bottom)" FontWeight="SemiBold" Foreground="#CCCCCC" FontSize="12"/>
+                <ItemsControl ItemsSource="{Binding EffectItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                <TextBlock Text="{Binding Name}" Width="130" VerticalAlignment="Center" Foreground="White"/>
+                                <Button Content="▲" Command="{Binding MoveUpCommand}" CommandParameter="{Binding}" Padding="8,2"/>
+                                <Button Content="▼" Command="{Binding MoveDownCommand}" CommandParameter="{Binding}" Padding="8,2"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
     </DockPanel>
 </Window>

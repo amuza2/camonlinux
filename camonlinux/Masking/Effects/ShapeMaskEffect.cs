@@ -29,6 +29,7 @@ public sealed class ShapeMaskEffect : IMaskEffect
         var feather = settings.Feather;
         var featherAmt = settings.FeatherAmount;
         var frameCheck = settings.FrameCheck;
+        var invert = settings.Invert;
         var data = frame.Data;
 
         var vertices = ShapeGeometry.ShapeVertices(settings, w, h);
@@ -41,6 +42,8 @@ public sealed class ShapeMaskEffect : IMaskEffect
             {
                 var d = ShapeGeometry.ShapeDistance(x + 0.5, y + 0.5, settings, w, h, vertices);
                 var cov = ShapeGeometry.Coverage(d, feather, featherAmt);
+                if (invert)
+                    cov = 1.0 - cov;
                 coverage[rowBase + x] = (byte)(cov * 255.0 + 0.5);
 
                 if (frameCheck && Math.Abs(d) < 1.5)

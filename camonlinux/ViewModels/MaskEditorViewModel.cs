@@ -1,5 +1,7 @@
 using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -91,6 +93,7 @@ public partial class MaskEditorViewModel : ObservableObject
         _featherEnabled = featherEffect.Enabled;
         _adjustmentEnabled = adjustmentEffect.Enabled;
         shape.PropertyChanged += OnShapeSettingsChanged;
+        RefreshEffectOrder();
     }
 
     /// <summary>Raised when the user toggles enable (so the main window's toolbar toggle stays in sync).</summary>
@@ -186,5 +189,67 @@ public partial class MaskEditorViewModel : ObservableObject
         Shape.PositionX = 0;
         Shape.PositionY = 0;
         Shape.SceneScale = 1.0;
+    }
+
+    // --- effect ordering (the pipeline runs effects in list order) ---
+
+    /// <summary>Effect list for the reorder UI (kept in sync with <see cref="Pipeline"/>).</summary>
+    public ObservableCollection<MaskEffectItem> EffectItems { get; } = new();
+
+    public void RefreshEffectOrder()
+    {
+        EffectItems.Clear();
+        foreach (var effect in Pipeline.Effects)
+            EffectItems.Add(new MaskEffectItem(effect, MoveEffectUp, MoveEffectDown));
+    }
+
+    [RelayCommand]
+    private void MoveEffectUp(MaskEffectItem? item)
+    {
+        if (item is null)
+            return;
+        var i = EffectItems.IndexOf(item);
+        if (i <= 0)
+            return;
+        SwapEffects(i, i - 1);
+    }
+
+    [RelayCommand]
+    private void MoveEffectDown(MaskEffectItem? item)
+    {
+        if (item is null)
+            return;
+        var i = EffectItems.IndexOf(item);
+        if (i < 0 || i >= EffectItems.Count - 1)
+            return;
+        SwapEffects(i, i + 1);
+    }
+
+    private void SwapEffects(int a, int b)
+    {
+        if (a < 0 || b < 0 || a >= Pipeline.Effects.Count || b >= Pipeline.Effects.Count)
+            return;
+        (Pipeline.Effects[a], Pipeline.Effects[b]) = (Pipeline.Effects[b], Pipeline.Effects[a]);
+        RefreshEffectOrder();
+    }
+}
+
+/// <summary>Display wrapper for a single pipeline effect (name + instance + move commands).</summary>
+public sealed class MaskEffectItem
+{
+    public Masking.IMaskEffect Effect { get; }
+    public string Name { get; }
+    public ICommand MoveUpCommand { get; }
+    public ICommand MoveDownCommand { get; }
+
+    public MaskEffectItem(
+        Masking.IMaskEffect effect,
+        Action<MaskEffectItem> moveUp,
+        Action<MaskEffectItem> moveDown)
+    {
+        Effect = effect;
+        Name = effect.Name;
+        MoveUpCommand = new RelayCommand(() => moveUp(this));
+        MoveDownCommand = new RelayCommand(() => moveDown(this));
     }
 }

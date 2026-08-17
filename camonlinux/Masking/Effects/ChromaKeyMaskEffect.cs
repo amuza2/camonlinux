@@ -39,6 +39,11 @@ public sealed class ChromaKeyMaskEffect : IMaskEffect
         var gamma = Math.Max(0.01, s.Gamma / 100.0);
         var spill = s.SpillReduction / 100.0;
         var showMatte = s.ShowMatte;
+        var invert = s.Invert;
+        var superKey = s.SuperKey;
+        var keyStrength = Math.Max(0.05, s.K);
+        var keyEdge = Math.Max(0.05, s.K2);
+        var veil = s.Veil / 100.0;
 
         Parallel.For(0, h, y =>
         {
@@ -50,11 +55,26 @@ public sealed class ChromaKeyMaskEffect : IMaskEffect
                 var g = data[i + 1];
                 var b = data[i];
 
-                var (_, cb, cr) = ColorMath.RgbToYcbcr(r / 255.0, g / 255.0, b / 255.0);
+                var (luma, cb, cr) = ColorMath.RgbToYcbcr(r / 255.0, g / 255.0, b / 255.0);
                 var d1 = ColorMath.ChromaDistance(cb, cr, cbKey, crKey);
                 var d = d1;
                 if (s.DoubleColor)
                     d = Math.Min(d, ColorMath.ChromaDistance(cb, cr, cbKey2, crKey2));
+
+                // Super Key (experimental, approximate): K scales the key distance
+                // (higher K = tighter key), K2 sharpens/softens the edge, Veil fades
+                // the matte out for very bright or very dark pixels (a luma veil).
+                if (superKey)
+                {
+                    d = d * keyEdge / keyStrength;
+                    if (veil > 0.0)
+                    {
+                        var lo = 0.5 * veil;
+                        var hi = 1.0 - 0.5 * veil;
+                        if (luma < lo || luma > hi)
+                            d = 1.0;
+                    }
+                }
 
                 // matte = 1 (masked/transparent) near the key, 0 elsewhere.
                 var matte = 1.0 - SmoothStep(threshold - soft, threshold + soft, d);
@@ -63,6 +83,8 @@ public sealed class ChromaKeyMaskEffect : IMaskEffect
                 matte = (matte - 0.5) * contrast + 0.5 + brightness;
                 if (matte < 0) matte = 0; else if (matte > 1) matte = 1;
                 matte = Math.Pow(matte, 1.0 / gamma) * opacity;
+                if (invert)
+                    matte = 1.0 - matte;
 
                 var pi = i;
                 if (showMatte)

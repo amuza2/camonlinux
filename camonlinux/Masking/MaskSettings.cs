@@ -81,6 +81,7 @@ public partial class ShapeMaskSettings : ObservableObject
     // --- feathering ---
     [ObservableProperty] private FeatherType _feather = FeatherType.None;
     [ObservableProperty] private double _featherAmount = 10;
+    [ObservableProperty] private bool _invert;
 
     public void Reset()
     {
@@ -97,7 +98,7 @@ public partial class ShapeMaskSettings : ObservableObject
         StarPoints = 5; StarOuter = 100; StarInner = 50; StarCornerRadius = 0; StarRotation = 0;
         HeartSize = 100; HeartRotation = 0;
         SuperMode = SuperformulaMode.General; A = 1; B = 1; M = 4; N1 = 1; N2 = 1; N3 = 1;
-        Feather = FeatherType.None; FeatherAmount = 10;
+        Feather = FeatherType.None; FeatherAmount = 10; Invert = false;
     }
 }
 
@@ -159,6 +160,11 @@ public partial class ChromaKeyMaskSettings : ObservableObject
     [ObservableProperty] private double _contrast;
     [ObservableProperty] private double _brightness;
     [ObservableProperty] private double _gamma = 100;
+    [ObservableProperty] private bool _superKey;
+    [ObservableProperty] private double _k = 1;
+    [ObservableProperty] private double _k2 = 1;
+    [ObservableProperty] private double _veil = 30;
+    [ObservableProperty] private bool _invert;
 
     public void Reset()
     {
@@ -167,5 +173,6 @@ public partial class ChromaKeyMaskSettings : ObservableObject
         KeyR2 = 0; KeyG2 = 0; KeyB2 = 255;
         Similarity = 80; Smoothness = 10; SpillReduction = 20;
         Opacity = 100; Contrast = 0; Brightness = 0; Gamma = 100;
+        SuperKey = false; K = 1; K2 = 1; Veil = 30; Invert = false;
     }
 }
