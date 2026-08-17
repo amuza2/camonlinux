@@ -127,6 +127,9 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>Photo file format: "jpeg" or "png".</summary>
     public string PhotoFormat { get; set; } = "jpeg";
+
+    /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
+    public bool ShowTimestamp { get; set; }
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -440,6 +443,9 @@ public sealed class GStreamerCaptureService : ICaptureService
         var rotation = Rotation == "auto" ? "" : $"videoflip video-direction={Rotation} ! ";
         var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
         var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{effect} ! ";
+        var overlay = ShowTimestamp
+            ? $"textoverlay text=\"{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}\" valignment=bottom halignment=right font-desc=\"Sans 24\" ! "
+            : "";
         // Audio branch: default mic -> optional live mute -> AAC, muxed into the MKV.
         var audio = includeAudio && _audioSource is not null
             ? $" {_audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
@@ -449,7 +455,7 @@ public sealed class GStreamerCaptureService : ICaptureService
         // x264enc's bitrate is in kbit/s.
         var bitrate = _recordQuality switch { "low" => 500, "high" => 5_000, _ => 1_500 };
         return
-            $"{SourcePrefix()} ! videoconvert ! {ZoomStage()}{rotation}{mirror}{effectChain}tee name=t " +
+            $"{SourcePrefix()} ! videoconvert ! {ZoomStage()}{rotation}{mirror}{effectChain}{overlay}tee name=t " +
             "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
             $"t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency bitrate={bitrate} " +
             $"! matroskamux name=mux ! filesink name=filesink location=\"{path}\"{audio}";
@@ -495,6 +501,35 @@ public sealed class GStreamerCaptureService : ICaptureService
         var info = new SKImageInfo(frame.Width, frame.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         using var bitmap = new SKBitmap(info);
         Marshal.Copy(frame.Data, 0, bitmap.GetPixels(), frame.Data.Length);
+
+        if (ShowTimestamp)
+        {
+            using var canvas = new SKCanvas(bitmap);
+            var fontSize = Math.Max(16f, frame.Height / 24f);
+            using var textPaint = new SKPaint
+            {
+                Color = SKColors.White,
+                TextSize = fontSize,
+                IsAntialias = true,
+                FakeBoldText = true,
+                Typeface = SKTypeface.FromFamilyName("monospace")
+            };
+            var text = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var x = frame.Width - 8 - textPaint.MeasureText(text);
+            var y = frame.Height - 8;
+            using var outline = new SKPaint
+            {
+                Color = SKColors.Black,
+                TextSize = fontSize,
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 3f,
+                Typeface = textPaint.Typeface
+            };
+            canvas.DrawText(text, x, y, outline);
+            canvas.DrawText(text, x, y, textPaint);
+        }
+
         using var image = SKImage.FromBitmap(bitmap);
         var format = PhotoFormat == "png" ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg;
         using var encoded = image.Encode(format, 92);

@@ -43,6 +43,9 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Photo file format: "jpeg" or "png".</summary>
     string PhotoFormat { get; set; }
 
+    /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
+    bool ShowTimestamp { get; set; }
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 

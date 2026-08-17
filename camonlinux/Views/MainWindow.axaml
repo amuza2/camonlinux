@@ -26,6 +26,13 @@
                             <TextBlock Text="Mirror"/>
                         </StackPanel>
                     </ToggleButton>
+                    <ToggleButton IsChecked="{Binding ShowTimestamp}"
+                                  ToolTip.Tip="Stamp photos &amp; videos with the date and time">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x1F552;"/>
+                            <TextBlock Text="Stamp"/>
+                        </StackPanel>
+                    </ToggleButton>
                     <Button Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Scan for cameras">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="&#x21BB;"/>

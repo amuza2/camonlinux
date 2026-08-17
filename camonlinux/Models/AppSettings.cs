@@ -16,6 +16,7 @@ public sealed class AppSettings
     public string Rotation { get; set; } = "auto";
     public double Zoom { get; set; } = 1.0;
     public string PhotoFormat { get; set; } = "jpeg";
+    public bool ShowTimestamp { get; set; }
     public List<string> FavoriteEffects { get; set; } = new();
     public string? LastDeviceId { get; set; }
 }

@@ -107,6 +107,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _selectedPhotoFormat = "JPEG";
 
     [ObservableProperty]
+    private bool _showTimestamp;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -139,9 +142,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
         _selectedPhotoFormat = _photoFormat == "png" ? "PNG" : "JPEG";
+        _showTimestamp = settings.Settings.ShowTimestamp;
         _capture.Rotation = settings.Settings.Rotation;
         _capture.Zoom = settings.Settings.Zoom;
         _capture.PhotoFormat = settings.Settings.PhotoFormat;
+        _capture.ShowTimestamp = settings.Settings.ShowTimestamp;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -449,6 +454,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.PhotoFormat = _photoFormat;
         _settings.Save();
         _capture.PhotoFormat = _photoFormat;
+    }
+
+    partial void OnShowTimestampChanged(bool value)
+    {
+        _settings.Settings.ShowTimestamp = value;
+        _settings.Save();
+        _capture.ShowTimestamp = value;
     }
 
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
