@@ -113,23 +113,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // frei0r filters (shipped by frei0r-plugins + gst-plugins-bad). They are
         // only added when the plugin is actually installed, so the gallery doesn't
-        // show effects that would silently fall back.
+        // show effects that would silently fall back. Element names carry a
+        // "frei0r-filter-" prefix (e.g. frei0r-filter-cartoon).
         AddEffectsIfAvailable(
-            new EffectOption("frei0r.cartoon", "Cartoon", "frei0r.cartoon"),
-            new EffectOption("frei0r.edgeglow", "Edge Glow", "frei0r.edgeglow"),
-            new EffectOption("frei0r.invert0r", "Invert", "frei0r.invert0r"),
-            new EffectOption("frei0r.kmeans", "Posterize", "frei0r.k-means"),
-            new EffectOption("frei0r.night", "Night Vision", "frei0r.night"),
-            new EffectOption("frei0r.pixeliz0r", "Pixelate", "frei0r.pixeliz0r"),
-            new EffectOption("frei0r.sketch0r", "Sketch", "frei0r.sketch0r"),
-            new EffectOption("frei0r.vertigo", "Vertigo", "frei0r.vertigo"),
-            new EffectOption("frei0r.vignette", "Vignette", "frei0r.vignette"),
-            new EffectOption("frei0r.bigbrother", "CCTV", "frei0r.bigbrother"),
-            new EffectOption("frei0r.bulge", "Bulge FX", "frei0r.bulge"),
-            new EffectOption("frei0r.infrared", "Infrared", "frei0r.infrared"),
-            new EffectOption("frei0r.emboss", "Emboss", "frei0r.emboss"),
-            new EffectOption("frei0r.sobel", "Sobel", "frei0r.sobel"),
-            new EffectOption("frei0r.solarize", "Solarize", "frei0r.solarize"));
+            new EffectOption("frei0r-filter-cartoon", "Cartoon", "frei0r-filter-cartoon"),
+            new EffectOption("frei0r-filter-edgeglow", "Edge Glow", "frei0r-filter-edgeglow"),
+            new EffectOption("frei0r-filter-invert0r", "Invert", "frei0r-filter-invert0r"),
+            new EffectOption("frei0r-filter-posterize", "Posterize", "frei0r-filter-posterize"),
+            new EffectOption("frei0r-filter-k-means-clustering", "K-Means", "frei0r-filter-k-means-clustering"),
+            new EffectOption("frei0r-filter-pixeliz0r", "Pixelate", "frei0r-filter-pixeliz0r"),
+            new EffectOption("frei0r-filter-vertigo", "Vertigo", "frei0r-filter-vertigo"),
+            new EffectOption("frei0r-filter-vignette", "Vignette", "frei0r-filter-vignette"),
+            new EffectOption("frei0r-filter-emboss", "Emboss", "frei0r-filter-emboss"),
+            new EffectOption("frei0r-filter-sobel", "Sobel", "frei0r-filter-sobel"),
+            new EffectOption("frei0r-filter-glow", "Glow", "frei0r-filter-glow"),
+            new EffectOption("frei0r-filter-softglow", "Soft Glow", "frei0r-filter-softglow"),
+            new EffectOption("frei0r-filter-rgbsplit0r", "RGB Split", "frei0r-filter-rgbsplit0r"),
+            new EffectOption("frei0r-filter-heatmap0r", "Heatmap", "frei0r-filter-heatmap0r"),
+            new EffectOption("frei0r-filter-ntsc", "NTSC", "frei0r-filter-ntsc"),
+            new EffectOption("frei0r-filter-water", "Water", "frei0r-filter-water"),
+            new EffectOption("frei0r-filter-glitch0r", "Glitch", "frei0r-filter-glitch0r"));
     }
 
     /// <summary>Adds effects only if their first pipeline element is available on this system.</summary>

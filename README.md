@@ -11,7 +11,7 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - Live webcam preview (GStreamer `v4l2src` → `appsink`, rendered on a `WriteableBitmap`)
 - Take photos (JPEG, saved to `~/Pictures`)
 - **Burst mode** — take a photo every 2.5 s
-- **Effects gallery** — 25 built-in GStreamer effects plus up to 15 **frei0r** filters (cartoon, night vision, pixelate, CCTV, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame
+- **Effects gallery** — 25 built-in GStreamer effects plus up to 17 **frei0r** filters (cartoon, posterize, pixelate, RGB split, glitch, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame
 - Record videos (H.264 + Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
