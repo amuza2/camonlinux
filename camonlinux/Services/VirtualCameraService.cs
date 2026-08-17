@@ -27,6 +27,32 @@ public sealed class VirtualCameraService : IDisposable
     private int _width;
     private int _height;
     private long _frameCounter;
+    private byte[]? _compositeScratch;
+
+    /// <summary>
+    /// Background colour (0..255) used to fill masked-out (transparent) areas of the
+    /// virtual feed — like OBS's virtual camera, so the shape/adjust mask is actually
+    /// visible to consumer apps (Discord). Default black; green is handy for Discord's
+    /// background replacement.
+    /// </summary>
+    public (byte R, byte G, byte B) Background { get; set; } = (0, 0, 0);
+
+    /// <summary>Sets <see cref="Background"/> from a name: "Black", "Green" or "White".</summary>
+    public void SetBackground(string? name)
+    {
+        switch (name?.Trim().ToLowerInvariant())
+        {
+            case "green":
+                Background = (0, 255, 0);
+                break;
+            case "white":
+                Background = (255, 255, 255);
+                break;
+            default:
+                Background = (0, 0, 0);
+                break;
+        }
+    }
 
     public bool IsRunning
     {
@@ -120,6 +146,12 @@ public sealed class VirtualCameraService : IDisposable
                     Stop();
                     return false;
                 }
+                // appsrc must advertise the caps so every pushed buffer carries them;
+                // otherwise the downstream caps filter rejects the raw buffers.
+                var srcCaps = Gst.Caps.FromString(
+                    $"video/x-raw,format=BGRx,width={_width},height={_height},framerate={_fps}/1");
+                if (srcCaps is not null)
+                    _appSrc.Caps = srcCaps;
                 // Cap buffered frames so a slow consumer can't stall the preview badly.
                 try { _appSrc.SetProperty("max-buffers", new Value(2u)); }
                 catch { /* optional tuning */ }
@@ -136,8 +168,13 @@ public sealed class VirtualCameraService : IDisposable
         }
     }
 
-    /// <summary>Push one processed frame (BGRA/BGRx, width * height * 4 bytes).</summary>
-    public void PushFrame(byte[] data, int width, int height)
+    /// <summary>
+    /// Push one processed frame (BGRA/BGRx, width * height * 4 bytes).
+    /// When <paramref name="compositeMask"/> is true, alpha-masked (transparent)
+    /// pixels are blended against <see cref="Background"/> so the mask is visible
+    /// to consumer apps (v4l2 drops alpha).
+    /// </summary>
+    public void PushFrame(byte[] data, int width, int height, bool compositeMask = false)
     {
         if (data is null || data.Length == 0)
             return;
@@ -145,6 +182,11 @@ public sealed class VirtualCameraService : IDisposable
         // Throttle to ~15 fps so we don't memdup an 8 MB buffer at full capture rate.
         if ((++_frameCounter & 1) != 0)
             return;
+
+        if (compositeMask)
+        {
+            data = CompositeAgainstBackground(data);
+        }
 
         AppSrc? src;
         lock (_lock)
@@ -196,6 +238,41 @@ public sealed class VirtualCameraService : IDisposable
             _pipeline = null;
             Start(device, width, height, fps);
         }
+    }
+
+    /// <summary>
+    /// Blends alpha-masked (transparent) pixels against <see cref="Background"/> into
+    /// a fully-opaque buffer, so the shape/adjust mask is visible to consumer apps.
+    /// Reuses a scratch buffer across frames.
+    /// </summary>
+    private byte[] CompositeAgainstBackground(byte[] data)
+    {
+        if (_compositeScratch is null || _compositeScratch.Length != data.Length)
+            _compositeScratch = new byte[data.Length];
+
+        var (br, bg, bb) = Background;
+        var dst = _compositeScratch;
+        var count = data.Length / 4;
+        for (var p = 0; p < count; p++)
+        {
+            var o = p * 4;
+            var a = data[o + 3];
+            if (a == 255)
+            {
+                dst[o] = data[o];
+                dst[o + 1] = data[o + 1];
+                dst[o + 2] = data[o + 2];
+            }
+            else
+            {
+                var ia = 255 - a;
+                dst[o] = (byte)((data[o] * a + bb * ia) / 255);
+                dst[o + 1] = (byte)((data[o + 1] * a + bg * ia) / 255);
+                dst[o + 2] = (byte)((data[o + 2] * a + br * ia) / 255);
+            }
+            dst[o + 3] = 255;
+        }
+        return dst;
     }
 
     /// <summary>Stops the pipeline and releases the loopback device.</summary>

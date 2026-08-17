@@ -48,6 +48,8 @@ public partial class MainWindow : Window
             {
                 if (e.PropertyName == nameof(MainWindowViewModel.IsMaskEnabled))
                     VideoSurfaceControl.CompositeAlpha = vm.IsMaskEnabled;
+                else if (e.PropertyName == nameof(MainWindowViewModel.VirtualCamBackground))
+                    _virtualCamera?.SetBackground(vm.VirtualCamBackground);
             };
 
             // Keep the on-preview mask handle in sync with the shape's centre.
@@ -75,7 +77,9 @@ public partial class MainWindow : Window
             _lastFrameW = frame.Width;
             _lastFrameH = frame.Height;
             VideoSurfaceControl.PushFrame(frame);
-            _virtualCamera?.PushFrame(frame.Data, frame.Width, frame.Height);
+            _virtualCamera?.PushFrame(
+                frame.Data, frame.Width, frame.Height,
+                compositeMask: _maskPipeline is { Enabled: true });
         };
     }
 
@@ -159,7 +163,12 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Gives the window access to settings for window-state persistence.</summary>
-    public void SetSettings(SettingsService settings) => _settings = settings;
+    public void SetSettings(SettingsService settings)
+    {
+        _settings = settings;
+        // Apply the virtual-webcam background (fills masked-out areas) from settings.
+        _virtualCamera?.SetBackground(settings.Settings.VirtualCamBackground);
+    }
 
     // ------------------------------------------------------------------ //
     // Draggable mask-position overlay

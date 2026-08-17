@@ -222,6 +222,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private bool _isVideoMode;
     [ObservableProperty] private bool _isMaskEnabled;
     [ObservableProperty] private bool _isVirtualCamEnabled;
+    [ObservableProperty] private string _virtualCamBackground = "Black";
 
     public MainWindowViewModel(
         ICaptureService capture,
@@ -257,6 +258,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedBurstInterval = MapBurstIntervalLabel(_burstIntervalSeconds);
         _selectedBurstCount = _burstCount == 0 ? "Unlimited" : _burstCount.ToString();
         _isVideoMode = settings.Settings.IsVideoMode;
+        _virtualCamBackground = string.IsNullOrEmpty(settings.Settings.VirtualCamBackground)
+            ? "Black"
+            : settings.Settings.VirtualCamBackground;
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
@@ -686,6 +690,12 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnIsVideoModeChanged(bool value)
     {
         _settings.Settings.IsVideoMode = value;
+        _settings.Save();
+    }
+
+    partial void OnVirtualCamBackgroundChanged(string value)
+    {
+        _settings.Settings.VirtualCamBackground = value;
         _settings.Save();
     }
 
@@ -1733,7 +1743,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
 
         var dialog = new SettingsWindow(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory,
-            SelectedBurstInterval, SelectedBurstCount);
+            SelectedBurstInterval, SelectedBurstCount, VirtualCamBackground);
         var saved = await dialog.ShowDialog<bool>(owner);
         if (!saved)
             return;
@@ -1742,6 +1752,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.VideoDirectory = dialog.VideoDirectory;
         SelectedBurstInterval = dialog.BurstInterval; // persists via handler
         SelectedBurstCount = dialog.BurstCount;       // persists via handler
+        VirtualCamBackground = dialog.VirtualCamBackground; // persists via handler below
         _settings.Save();
         _mediaLibrary.Watch(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
         RefreshGallery();

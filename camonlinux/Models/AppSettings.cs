@@ -39,4 +39,7 @@ public sealed class AppSettings
     public double WinWidth { get; set; } = 960;
     public double WinHeight { get; set; } = 600;
     public string? LastDeviceId { get; set; }
+
+    /// <summary>Background used for masked-out (transparent) areas of the virtual webcam.</summary>
+    public string VirtualCamBackground { get; set; } = "Black";
 }
