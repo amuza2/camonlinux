@@ -15,6 +15,14 @@
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen">
 
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Space" Command="{Binding TakePhotoCommand}"/>
+        <KeyBinding Gesture="R" Command="{Binding ToggleRecordingCommand}"/>
+        <KeyBinding Gesture="B" Command="{Binding ToggleBurstCommand}"/>
+        <KeyBinding Gesture="M" Command="{Binding ToggleMirrorCommand}"/>
+        <KeyBinding Gesture="E" Command="{Binding ToggleEffectsPanelCommand}"/>
+    </Window.KeyBindings>
+
     <DockPanel Background="Black">
 
         <!-- Top toolbar -->
@@ -99,6 +107,7 @@
 
         <!-- Right panel: captures / effects -->
         <Border DockPanel.Dock="Right" Width="240" Background="#202020">
+            <Grid>
             <DockPanel>
                 <Grid DockPanel.Dock="Top" Margin="8,10,8,6" ColumnDefinitions="*,*" ColumnSpacing="6">
                     <ToggleButton Grid.Column="0" Content="Captures" IsChecked="{Binding !ShowEffectsPanel}"/>
@@ -193,6 +202,11 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </DockPanel>
+            <TextBlock Text="No captures yet — take a photo or record a video."
+                       Foreground="#888888" FontSize="12" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="14"
+                       IsVisible="{Binding ShowGalleryEmptyHint}"/>
+            </Grid>
         </Border>
 
         <!-- Capture controls -->
@@ -255,6 +269,13 @@
             </TextBlock>
             <!-- White flash on photo capture -->
             <Border Background="White" IsVisible="{Binding IsFlashing}" IsHitTestVisible="False"/>
+
+            <!-- Toast notification -->
+            <Border Background="#E0222222" CornerRadius="6" Padding="16,10"
+                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,16,0,0"
+                    IsVisible="{Binding IsToastVisible}" IsHitTestVisible="False">
+                <TextBlock Text="{Binding ToastText}" Foreground="White" FontSize="14"/>
+            </Border>
         </Grid>
     </DockPanel>
 </Window>

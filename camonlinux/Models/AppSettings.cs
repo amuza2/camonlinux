@@ -22,5 +22,8 @@ public sealed class AppSettings
     public int Saturation { get; set; } = 128;
     public List<string> FavoriteEffects { get; set; } = new();
     public Dictionary<string, double> EffectIntensities { get; set; } = new();
+    public bool IsMaximized { get; set; } = true;
+    public double WinWidth { get; set; } = 960;
+    public double WinHeight { get; set; } = 600;
     public string? LastDeviceId { get; set; }
 }

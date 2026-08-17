@@ -35,6 +35,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _countdownRemaining;
     private string _photoFormat = "jpeg";
     private Timer? _cameraControlsDebounce;
+    private Timer? _toastTimer;
+    private Timer? _galleryRefreshDebounce;
     private bool _loadingIntensity;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
@@ -127,6 +129,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private double _effectIntensity = 1.0;
+
+    [ObservableProperty]
+    private string _toastText = "";
+
+    [ObservableProperty]
+    private bool _isToastVisible;
+
+    [ObservableProperty]
+    private bool _showGalleryEmptyHint;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -326,6 +337,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Enumerates supported capture modes, then starts the preview.
         await OnDeviceSelectedAsync(SelectedDevice);
+
+        // Auto-refresh the gallery when files change in the capture folders.
+        _mediaLibrary.CollectionChanged -= OnMediaCollectionChanged;
+        _mediaLibrary.CollectionChanged += OnMediaCollectionChanged;
+        _mediaLibrary.Watch(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
+
         RefreshGallery();
         IsBusy = false;
     }
@@ -603,6 +620,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (value)
             _ = GenerateEffectThumbnailsAsync();
+        UpdateGalleryEmptyHint();
     }
 
     /// <summary>Renders a small live preview of every effect from a camera frame.</summary>
@@ -827,6 +845,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             await _capture.TakePhotoAsync(path);
             StatusMessage = $"Photo saved to {Path.GetFileName(path)}";
+            ShowToast($"Photo saved to {Path.GetFileName(path)}");
             NotificationService.Notify("Photo taken", Path.GetFileName(path));
             RefreshGallery();
         }
@@ -910,6 +929,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     TimeSpan.Zero,
                     TimeSpan.FromSeconds(1));
                 StatusMessage = "Recording…";
+                ShowToast("Recording started");
             }
             catch (Exception ex)
             {
@@ -924,6 +944,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _recordingTimer = null;
             RecordingTime = "00:00";
             StatusMessage = "Recording saved.";
+            ShowToast("Recording saved");
             NotificationService.Notify("Video saved");
             RefreshGallery();
         }
@@ -947,6 +968,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var item in items)
             GalleryItems.Add(item);
 
+        UpdateGalleryEmptyHint();
         _ = GenerateGalleryThumbnailsAsync();
     }
 
@@ -1068,16 +1090,59 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
-    private Task DeleteSelectedAsync()
+    /// <summary>Shows a brief overlay toast that auto-hides.</summary>
+    private void ShowToast(string message)
     {
-        if (SelectedGalleryItem is null)
-            return Task.CompletedTask;
+        ToastText = message;
+        IsToastVisible = true;
+        _toastTimer?.Dispose();
+        _toastTimer = new Timer(
+            _ => Dispatcher.UIThread.Post(() => IsToastVisible = false),
+            null,
+            TimeSpan.FromMilliseconds(2500),
+            TimeSpan.FromMilliseconds(-1));
+    }
 
-        if (TrashService.Trash(SelectedGalleryItem.Path))
-            GalleryItems.Remove(SelectedGalleryItem);
+    [RelayCommand]
+    private void ToggleMirror() => Mirrored = !Mirrored;
 
-        return Task.CompletedTask;
+    [RelayCommand]
+    private void ToggleEffectsPanel() => ShowEffectsPanel = !ShowEffectsPanel;
+
+    /// <summary>Debounces rapid file events (e.g. burst captures) and refreshes the gallery.</summary>
+    private void OnMediaCollectionChanged()
+    {
+        _galleryRefreshDebounce?.Dispose();
+        _galleryRefreshDebounce = new Timer(
+            _ => Dispatcher.UIThread.Post(RefreshGallery),
+            null,
+            TimeSpan.FromMilliseconds(400),
+            TimeSpan.FromMilliseconds(-1));
+    }
+
+    private void UpdateGalleryEmptyHint() => ShowGalleryEmptyHint = GalleryItems.Count == 0 && !ShowEffectsPanel;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
+    private async Task DeleteSelectedAsync()
+    {
+        var item = SelectedGalleryItem;
+        if (item is null)
+            return;
+
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+
+        var confirmed = await new ConfirmDialog("Move to trash", $"Move \"{item.Name}\" to the trash?").ShowDialog<bool>(owner);
+        if (!confirmed)
+            return;
+
+        if (TrashService.Trash(item.Path))
+        {
+            GalleryItems.Remove(item);
+            UpdateGalleryEmptyHint();
+            ShowToast("Moved to trash");
+        }
     }
 
     private bool CanDeleteSelected() => SelectedGalleryItem is not null;
@@ -1220,7 +1285,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.PhotoDirectory = dialog.PhotoDirectory;
         _settings.Settings.VideoDirectory = dialog.VideoDirectory;
         _settings.Save();
+        _mediaLibrary.Watch(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
         RefreshGallery();
+        ShowToast("Settings saved");
         StatusMessage = "Settings saved.";
     }
 }

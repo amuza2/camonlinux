@@ -45,6 +45,7 @@ public partial class App : Application
                 DataContext = viewModel
             };
             window.ConnectCapture(capture);
+            window.SetSettings(settings);
 
             desktop.MainWindow = window;
 

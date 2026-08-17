@@ -18,29 +18,41 @@ public sealed class MediaLibraryService : IDisposable
     private static readonly HashSet<string> VideoExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".webm", ".avi", ".mov" };
 
-    private FileSystemWatcher? _watcher;
+    private readonly List<FileSystemWatcher> _watchers = new();
 
-    /// <summary>Raised when files are created/deleted/renamed in the watched folder.</summary>
+    /// <summary>Raised when files are created/deleted/renamed in the watched folders.</summary>
     public event Action? CollectionChanged;
 
     public bool IsVideo(string extension) => VideoExtensions.Contains(extension);
 
-    public void Watch(string directory)
+    /// <summary>Watches one or more folders so the gallery can auto-refresh.</summary>
+    public void Watch(params string[] directories)
     {
         StopWatching();
 
-        if (!Directory.Exists(directory))
-            Directory.CreateDirectory(directory);
-
-        _watcher = new FileSystemWatcher(directory)
+        foreach (var directory in directories)
         {
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime,
-            IncludeSubdirectories = false
-        };
-        _watcher.Created += (_, _) => CollectionChanged?.Invoke();
-        _watcher.Deleted += (_, _) => CollectionChanged?.Invoke();
-        _watcher.Renamed += (_, _) => CollectionChanged?.Invoke();
-        _watcher.EnableRaisingEvents = true;
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+
+            var watcher = new FileSystemWatcher(directory)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime,
+                IncludeSubdirectories = false
+            };
+            watcher.Created += (_, _) => CollectionChanged?.Invoke();
+            watcher.Deleted += (_, _) => CollectionChanged?.Invoke();
+            watcher.Renamed += (_, _) => CollectionChanged?.Invoke();
+            watcher.EnableRaisingEvents = true;
+            _watchers.Add(watcher);
+        }
+    }
+
+    public void StopWatching()
+    {
+        foreach (var watcher in _watchers)
+            watcher.Dispose();
+        _watchers.Clear();
     }
 
     public List<MediaItem> LoadMedia(string directory)
@@ -65,12 +77,6 @@ public sealed class MediaLibraryService : IDisposable
                 fi.LastWriteTime,
                 fi.Length))
             .ToList();
-    }
-
-    public void StopWatching()
-    {
-        _watcher?.Dispose();
-        _watcher = null;
     }
 
     public void Dispose() => StopWatching();
