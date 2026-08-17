@@ -24,6 +24,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stopwatch _recordingStopwatch = new();
     private Timer? _recordingTimer;
     private Timer? _burstTimer;
+    private Timer? _photoCountdownTimer;
+    private int _timerSeconds;
+    private int _countdownRemaining;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
     private Timer? _devicesTimer;
@@ -36,6 +39,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> Resolutions { get; } = new();
     public ObservableCollection<string> QualityOptions { get; } = new() { "Low", "Medium", "High" };
     public ObservableCollection<string> MaxSizeOptions { get; } = new() { "Unlimited", "500 MB", "1 GB", "2 GB" };
+    public ObservableCollection<string> TimerOptions { get; } = new() { "Off", "3 s", "10 s" };
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -73,6 +77,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _selectedMaxSize = "Unlimited";
 
     [ObservableProperty]
+    private string _selectedTimer = "Off";
+
+    [ObservableProperty]
+    private bool _isCountingDown;
+
+    [ObservableProperty]
+    private string _countdownText = "";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -99,6 +112,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedResolution = settings.Settings.Resolution;
         _selectedQuality = MapQualityLabel(settings.Settings.RecordQuality);
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
+        _timerSeconds = settings.Settings.TimerSeconds;
+        _selectedTimer = MapTimerLabel(settings.Settings.TimerSeconds);
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -336,6 +351,16 @@ public partial class MainWindowViewModel : ViewModelBase
         _capture.MaxFileSizeMB = mb;
     }
 
+    partial void OnSelectedTimerChanged(string value)
+    {
+        _timerSeconds = value switch { "3 s" => 3, "10 s" => 10, _ => 0 };
+        _settings.Settings.TimerSeconds = _timerSeconds;
+        _settings.Save();
+        CancelPhotoCountdown();
+    }
+
+    private static string MapTimerLabel(int seconds) => seconds switch { 3 => "3 s", 10 => "10 s", _ => "Off" };
+
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
 
     private static string MapMaxSizeLabel(long mb) => mb switch { 500 => "500 MB", 1024 => "1 GB", 2048 => "2 GB", _ => "Unlimited" };
@@ -501,7 +526,71 @@ public partial class MainWindowViewModel : ViewModelBase
     // ------------------------------------------------------------------ //
 
     [RelayCommand(CanExecute = nameof(CanTakePhoto))]
-    private Task TakePhotoAsync() => CapturePhotoAsync();
+    private void TakePhoto()
+    {
+        // A second click while a countdown is running cancels it.
+        if (_photoCountdownTimer is not null)
+        {
+            CancelPhotoCountdown();
+            return;
+        }
+
+        if (_timerSeconds > 0)
+            StartPhotoCountdown();
+        else
+            _ = CapturePhotoAsync();
+    }
+
+    private void StartPhotoCountdown()
+    {
+        _countdownRemaining = _timerSeconds;
+        IsCountingDown = true;
+        UpdateCountdownText();
+        _photoCountdownTimer = new Timer(
+            _ => Dispatcher.UIThread.Post(OnPhotoCountdownTick),
+            null,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
+    }
+
+    private void OnPhotoCountdownTick()
+    {
+        if (_photoCountdownTimer is null)
+            return;
+
+        _countdownRemaining--;
+        if (_countdownRemaining <= 0)
+        {
+            StopPhotoCountdown();
+            _ = CapturePhotoAsync();
+        }
+        else
+        {
+            UpdateCountdownText();
+        }
+    }
+
+    private void UpdateCountdownText()
+    {
+        CountdownText = _countdownRemaining.ToString();
+        StatusMessage = $"Taking photo in {_countdownRemaining}…";
+    }
+
+    private void CancelPhotoCountdown()
+    {
+        if (_photoCountdownTimer is null && !IsCountingDown)
+            return;
+        StopPhotoCountdown();
+        StatusMessage = "Timer cancelled.";
+    }
+
+    private void StopPhotoCountdown()
+    {
+        _photoCountdownTimer?.Dispose();
+        _photoCountdownTimer = null;
+        IsCountingDown = false;
+        CountdownText = "";
+    }
 
     private async Task CapturePhotoAsync()
     {
@@ -538,6 +627,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_burstTimer is null)
         {
+            CancelPhotoCountdown();
             IsBurstActive = true;
             BurstButtonText = "Burst: On";
             StatusMessage = "Burst mode — taking a photo every 2.5 seconds.";
@@ -570,6 +660,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!IsRecording)
         {
             StopBurst();
+            CancelPhotoCountdown();
             var directory = _settings.Settings.VideoDirectory;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, $"video_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.mkv");

@@ -10,5 +10,6 @@ public sealed class AppSettings
     public string Resolution { get; set; } = "";
     public string RecordQuality { get; set; } = "medium";
     public long MaxFileSizeMB { get; set; }
+    public int TimerSeconds { get; set; }
     public string? LastDeviceId { get; set; }
 }

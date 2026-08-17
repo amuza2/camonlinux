@@ -135,6 +135,8 @@
                           Width="88" ToolTip.Tip="Recording quality"/>
                 <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}"
                           Width="100" ToolTip.Tip="Auto-split recordings at this size"/>
+                <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}"
+                          Width="76" ToolTip.Tip="Countdown before a photo"/>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
@@ -155,6 +157,13 @@
                        IsVisible="{Binding !IsPreviewActive}"
                        TextWrapping="Wrap" TextAlignment="Center" Margin="32"
                        MaxWidth="480"/>
+            <TextBlock Text="{Binding CountdownText}" FontSize="96" FontWeight="Bold"
+                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding IsCountingDown}">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
+                </TextBlock.Effect>
+            </TextBlock>
         </Grid>
     </DockPanel>
 </Window>
