@@ -101,6 +101,15 @@
                     <ToggleButton Grid.Column="1" Content="Effects" IsChecked="{Binding ShowEffectsPanel}"/>
                 </Grid>
 
+                <StackPanel DockPanel.Dock="Top" Margin="8,0,8,4" Spacing="2"
+                            IsVisible="{Binding ShowIntensitySlider}">
+                    <TextBlock Text="Effect intensity" Foreground="#CCCCCC" FontSize="12"/>
+                    <Slider Value="{Binding EffectIntensity}"
+                            Minimum="{Binding SelectedEffect.IntensityMin}"
+                            Maximum="{Binding SelectedEffect.IntensityMax}"
+                            Width="220"/>
+                </StackPanel>
+
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
                             IsVisible="{Binding !ShowEffectsPanel}">
                     <Button Content="Play video" Command="{Binding PlaySelectedCommand}"/>

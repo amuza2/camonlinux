@@ -21,5 +21,6 @@ public sealed class AppSettings
     public int Contrast { get; set; } = 128;
     public int Saturation { get; set; } = 128;
     public List<string> FavoriteEffects { get; set; } = new();
+    public Dictionary<string, double> EffectIntensities { get; set; } = new();
     public string? LastDeviceId { get; set; }
 }

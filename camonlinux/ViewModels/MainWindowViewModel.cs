@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -34,6 +35,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _countdownRemaining;
     private string _photoFormat = "jpeg";
     private Timer? _cameraControlsDebounce;
+    private bool _loadingIntensity;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
     private Timer? _devicesTimer;
@@ -121,6 +123,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _saturation = 128;
 
     [ObservableProperty]
+    private bool _showIntensitySlider;
+
+    [ObservableProperty]
+    private double _effectIntensity = 1.0;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -201,8 +209,8 @@ public partial class MainWindowViewModel : ViewModelBase
         Effects.Add(new EffectOption("heat", "Heat", "coloreffects preset=heat"));
         Effects.Add(new EffectOption("sepia", "Sepia", "coloreffects preset=sepia"));
         Effects.Add(new EffectOption("xray", "X-Ray", "coloreffects preset=xray"));
-        Effects.Add(new EffectOption("grayscale", "Grayscale", "videobalance saturation=0"));
-        Effects.Add(new EffectOption("vivid", "Vivid", "videobalance saturation=1.5"));
+        Effects.Add(new EffectOption("grayscale", "Grayscale", "videobalance saturation={I}", "saturation", 0, 1, 0));
+        Effects.Add(new EffectOption("vivid", "Vivid", "videobalance saturation={I}", "saturation", 0, 2, 1.5));
         Effects.Add(new EffectOption("agingtv", "Aging TV", "videobalance saturation=0 ! agingtv"));
 
         // frei0r filters (shipped by frei0r-plugins + gst-plugins-bad). They are
@@ -515,7 +523,36 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedEffectChanged(EffectOption? value)
     {
-        var filter = value?.Filter ?? "";
+        if (value is null)
+        {
+            ShowIntensitySlider = false;
+            _capture.Effect = "";
+            return;
+        }
+
+        if (value.HasIntensity)
+        {
+            // Load the remembered intensity (or the effect's default) without
+            // triggering a rebuild via the intensity changed handler.
+            _loadingIntensity = true;
+            try
+            {
+                EffectIntensity = _settings.Settings.EffectIntensities.TryGetValue(value.Id, out var saved)
+                    ? saved
+                    : value.IntensityDefault;
+            }
+            finally
+            {
+                _loadingIntensity = false;
+            }
+            ShowIntensitySlider = true;
+        }
+        else
+        {
+            ShowIntensitySlider = false;
+        }
+
+        var filter = BuildEffectFilter(value, EffectIntensity);
         if (_capture.Effect == filter)
             return; // same effect re-selected (e.g. after a reorder) — no restart
 
@@ -525,6 +562,30 @@ public partial class MainWindowViewModel : ViewModelBase
         // (Not while recording — it applies when the preview resumes.)
         if (IsPreviewActive && !IsRecording && SelectedDevice is not null)
             _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    partial void OnEffectIntensityChanged(double value)
+    {
+        if (_loadingIntensity)
+            return;
+
+        var effect = SelectedEffect;
+        if (effect is null || !effect.HasIntensity)
+            return;
+
+        _settings.Settings.EffectIntensities[effect.Id] = value;
+        _settings.Save();
+
+        _capture.Effect = BuildEffectFilter(effect, value);
+        if (IsPreviewActive && !IsRecording && SelectedDevice is not null)
+            _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    private static string BuildEffectFilter(EffectOption effect, double intensity)
+    {
+        if (!effect.HasIntensity)
+            return effect.Filter;
+        return effect.Filter.Replace("{I}", intensity.ToString("0.##", CultureInfo.InvariantCulture));
     }
 
     partial void OnShowEffectsPanelChanged(bool value)
@@ -559,8 +620,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue; // already generated
 
             var output = Path.Combine(thumbDir, $"{effect.Id}.png");
+            var filter = BuildEffectFilter(effect, effect.IntensityDefault);
             var rendered = await Task.Run(() =>
-                _capture.RenderEffectThumbnailAsync(effect.Filter, _sampleImagePath!, output, 100, 56));
+                _capture.RenderEffectThumbnailAsync(filter, _sampleImagePath!, output, 100, 56));
 
             if (rendered is not null)
             {
