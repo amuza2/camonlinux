@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -25,6 +26,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private Timer? _burstTimer;
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
+    private Timer? _devicesTimer;
+    private bool _pollingDevices;
+    private bool _suppressDeviceSwitch;
 
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
@@ -173,6 +177,10 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var device in devices)
             Devices.Add(device);
 
+        // Keep scanning /dev/video* so plugging/unplugging a camera updates the
+        // list live (also lets a camera plugged in later auto-start).
+        StartDevicePolling();
+
         if (Devices.Count == 0)
         {
             StatusMessage = "No camera found. Is it connected, and is your user in the 'video' group?";
@@ -217,7 +225,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedDeviceChanged(CameraDevice? value)
     {
-        if (value is null)
+        // Hot-plug may re-select the SAME camera (new instance, same id) — in that
+        // case we don't want to restart the preview, so skip via the flag.
+        if (value is null || _suppressDeviceSwitch)
             return;
 
         _settings.Settings.LastDeviceId = value.Id;
@@ -305,6 +315,91 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var device in devices)
             Devices.Add(device);
         IsBusy = false;
+    }
+
+    // ------------------------------------------------------------------ //
+    // Hot-plug detection
+    // ------------------------------------------------------------------ //
+
+    /// <summary>Scans /dev/video* every 2s and updates the device list live.</summary>
+    private void StartDevicePolling()
+    {
+        _devicesTimer?.Dispose();
+        _devicesTimer = new Timer(
+            _ => _ = PollDevicesAsync(),
+            null,
+            TimeSpan.FromSeconds(3),
+            TimeSpan.FromSeconds(2));
+    }
+
+    private async Task PollDevicesAsync()
+    {
+        if (_pollingDevices || IsBusy || IsRecording)
+            return;
+
+        _pollingDevices = true;
+        try
+        {
+            var devices = await _capture.RefreshDevicesAsync();
+            await Dispatcher.UIThread.InvokeAsync(() => ApplyDeviceChanges(devices));
+        }
+        catch
+        {
+            // Transient errors (hot-unplug race, dispatcher shutting down during
+            // app exit, …) are ignored — the next poll will simply retry.
+        }
+        finally
+        {
+            _pollingDevices = false;
+        }
+    }
+
+    /// <summary>
+    /// Applies a device-list change on the UI thread. Keeps the current selection
+    /// (without restarting the preview) when the same camera is still present, and
+    /// switches to another camera — or stops the preview — when it disappears.
+    /// </summary>
+    private void ApplyDeviceChanges(IReadOnlyList<CameraDevice> devices)
+    {
+        var currentIds = Devices.Select(d => d.Id).ToHashSet();
+        var nextIds = devices.Select(d => d.Id).ToHashSet();
+        if (currentIds.SetEquals(nextIds))
+            return; // nothing changed
+
+        var wasSelectedId = SelectedDevice?.Id;
+
+        Devices.Clear();
+        foreach (var device in devices)
+            Devices.Add(device);
+
+        // Same camera still present — keep the selection, don't restart preview.
+        var sameDevice = devices.FirstOrDefault(d => d.Id == wasSelectedId);
+        if (sameDevice is not null)
+        {
+            _suppressDeviceSwitch = true;
+            try { SelectedDevice = sameDevice; }
+            finally { _suppressDeviceSwitch = false; }
+            return;
+        }
+
+        // Selected camera disappeared — fall back to the first available one.
+        var fallback = devices.FirstOrDefault();
+        if (fallback is not null)
+        {
+            if (IsPreviewActive && wasSelectedId is not null)
+                StatusMessage = $"Camera disconnected — switched to {fallback.Name}";
+            SelectedDevice = fallback; // OnSelectedDeviceChanged restarts the preview
+            return;
+        }
+
+        // No cameras left.
+        if (IsPreviewActive)
+        {
+            _capture.StopPreviewAsync();
+            IsPreviewActive = false;
+            StatusMessage = "No camera connected.";
+        }
+        SelectedDevice = null;
     }
 
     // ------------------------------------------------------------------ //

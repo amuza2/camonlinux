@@ -15,6 +15,7 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - Record videos (H.264 + Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
+- **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
 - Recent captures gallery with **photo & video thumbnails** and delete (moves to trash)
 - Desktop notifications (`notify-send`)
 - Settings persisted to `~/.config/camonlinux/settings.json`
@@ -116,7 +117,7 @@ v4l2src ! videoconvert ! videoflip ! {effect} ! tee
 
 ## Roadmap / next steps
 
-- [ ] Device hot-plug detection (poll `/dev/video*` / inotify)
+- [x] Device hot-plug detection (poll `/dev/video*` every 2 s)
 - [x] frei0r effects (install `frei0r-plugins` + `gst-plugins-bad`) — auto-detected
 - [ ] Audio in recordings (PipeWire/pulse audio capture)
 - [ ] AppStream metainfo + AUR PKGBUILD
