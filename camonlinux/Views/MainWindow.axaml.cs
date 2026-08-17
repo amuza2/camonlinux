@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using camonlinux.Capture;
@@ -47,6 +48,9 @@ public partial class MainWindow : Window
                 if (e.PropertyName == nameof(MainWindowViewModel.IsMaskEnabled))
                     VideoSurfaceControl.CompositeAlpha = vm.IsMaskEnabled;
             };
+
+            // Keep the on-preview mask handle in sync with the shape's centre.
+            vm.MaskEditor.Shape.PropertyChanged += (_, _) => UpdateMaskHandlePosition();
         }
 
         capture.FrameReady += (_, frame) =>
@@ -133,6 +137,7 @@ public partial class MainWindow : Window
                 _maskEditorWindow.Closed += (_, _) => _maskEditorWindow = null;
             }
             _maskEditorWindow.Show(this);
+            UpdateMaskHandlePosition();
         }
         else if (_maskEditorWindow is not null)
         {
@@ -143,6 +148,55 @@ public partial class MainWindow : Window
 
     /// <summary>Gives the window access to settings for window-state persistence.</summary>
     public void SetSettings(SettingsService settings) => _settings = settings;
+
+    // ------------------------------------------------------------------ //
+    // Draggable mask-position overlay
+    // ------------------------------------------------------------------ //
+
+    private bool _maskDragging;
+
+    private void OnPreviewSizeChanged(object? sender, SizeChangedEventArgs e) => UpdateMaskHandlePosition();
+
+    private void UpdateMaskHandlePosition()
+    {
+        if (DataContext is not MainWindowViewModel vm || MaskHandle is null)
+            return;
+        var shape = vm.MaskEditor.Shape;
+        var b = VideoSurfaceControl.Bounds;
+        if (b.Width <= 0 || b.Height <= 0)
+            return;
+        Canvas.SetLeft(MaskHandle, (shape.CenterX / 100.0) * b.Width - MaskHandle.Width / 2);
+        Canvas.SetTop(MaskHandle, (shape.CenterY / 100.0) * b.Height - MaskHandle.Height / 2);
+    }
+
+    private void OnMaskHandlePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Ellipse handle)
+            return;
+        _maskDragging = true;
+        e.Pointer.Capture(handle);
+        e.Handled = true;
+    }
+
+    private void OnMaskHandleMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_maskDragging || DataContext is not MainWindowViewModel vm)
+            return;
+        var b = VideoSurfaceControl.Bounds;
+        if (b.Width <= 0 || b.Height <= 0)
+            return;
+        var pos = e.GetPosition(VideoSurfaceControl);
+        vm.MaskEditor.Shape.CenterX = Math.Clamp(pos.X / b.Width * 100.0, 0, 100);
+        vm.MaskEditor.Shape.CenterY = Math.Clamp(pos.Y / b.Height * 100.0, 0, 100);
+        UpdateMaskHandlePosition();
+        e.Handled = true;
+    }
+
+    private void OnMaskHandleReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        e.Pointer.Capture(null);
+        _maskDragging = false;
+    }
 
     /// <summary>Double-clicking a gallery item opens it with the default app.</summary>
     private void OnGalleryDoubleTapped(object? sender, TappedEventArgs e)

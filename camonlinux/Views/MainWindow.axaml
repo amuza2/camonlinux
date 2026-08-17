@@ -342,7 +342,19 @@
 
         <!-- Preview area -->
         <Grid>
-            <local:VideoSurface x:Name="VideoSurfaceControl" PointerWheelChanged="OnPreviewWheel"/>
+            <local:VideoSurface x:Name="VideoSurfaceControl" PointerWheelChanged="OnPreviewWheel" SizeChanged="OnPreviewSizeChanged"/>
+
+            <!-- Draggable mask-position handle (shown while masking is on). -->
+            <Canvas IsHitTestVisible="True">
+                <Ellipse x:Name="MaskHandle" Width="18" Height="18"
+                         Fill="#66FFFFFF" Stroke="White" StrokeThickness="2"
+                         IsVisible="{Binding IsMaskEnabled}" IsHitTestVisible="True"
+                         Cursor="SizeAll"
+                         PointerPressed="OnMaskHandlePressed"
+                         PointerMoved="OnMaskHandleMoved"
+                         PointerReleased="OnMaskHandleReleased"/>
+            </Canvas>
+
             <Border Background="#80000000" CornerRadius="6" Padding="14,8"
                     IsVisible="{Binding IsBusy}"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
