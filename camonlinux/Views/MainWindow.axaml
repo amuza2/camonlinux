@@ -45,6 +45,12 @@
                             <TextBlock Text="Folder"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding OpenSettingsCommand}" ToolTip.Tip="Settings">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x2699;"/>
+                            <TextBlock Text="Settings"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">

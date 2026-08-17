@@ -1100,4 +1100,23 @@ public partial class MainWindowViewModel : ViewModelBase
             Process.Start(new ProcessStartInfo("xdg-open", directory) { UseShellExecute = true });
         }
     }
+
+    [RelayCommand]
+    private async Task OpenSettingsAsync()
+    {
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+
+        var dialog = new SettingsWindow(_settings.Settings.PhotoDirectory, _settings.Settings.VideoDirectory);
+        var saved = await dialog.ShowDialog<bool>(owner);
+        if (!saved)
+            return;
+
+        _settings.Settings.PhotoDirectory = dialog.PhotoDirectory;
+        _settings.Settings.VideoDirectory = dialog.VideoDirectory;
+        _settings.Save();
+        RefreshGallery();
+        StatusMessage = "Settings saved.";
+    }
 }
