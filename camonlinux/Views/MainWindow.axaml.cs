@@ -1,8 +1,11 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using camonlinux.Capture;
+using camonlinux.Masking;
 using camonlinux.Services;
 using camonlinux.ViewModels;
 
@@ -11,16 +14,55 @@ namespace camonlinux.Views;
 public partial class MainWindow : Window
 {
     private SettingsService? _settings;
+    private MaskPipeline? _maskPipeline;
+    private MaskEditorWindow? _maskEditorWindow;
+    private readonly MaskFrame _maskFrame = new();
 
     public MainWindow()
     {
         InitializeComponent();
     }
 
-    /// <summary>Wires the capture service's frames to the preview surface.</summary>
-    public void ConnectCapture(ICaptureService capture)
+    /// <summary>
+    /// Wires the capture service's frames to the preview surface. When a mask pipeline
+    /// is provided, it is applied in place (BGRA32) on the streaming thread before the
+    /// frame is pushed to the UI.
+    /// </summary>
+    public void ConnectCapture(ICaptureService capture, MaskPipeline? maskPipeline)
     {
-        capture.FrameReady += (_, frame) => VideoSurfaceControl.PushFrame(frame);
+        _maskPipeline = maskPipeline;
+        capture.FrameReady += (_, frame) =>
+        {
+            if (_maskPipeline is { Enabled: true } && frame.Data.Length > 0)
+            {
+                _maskFrame.Set(frame.Data, frame.Width, frame.Height);
+                _maskPipeline.Apply(_maskFrame);
+            }
+            VideoSurfaceControl.PushFrame(frame);
+        };
+    }
+
+    /// <summary>Toolbar Mask toggle: enable masking and open the editor (or disable + close it).</summary>
+    private void OnMaskToggled(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
+            return;
+        vm.IsMaskEnabled = tb.IsChecked == true;
+        if (vm.IsMaskEnabled)
+        {
+            _maskEditorWindow ??= new MaskEditorWindow { DataContext = vm.MaskEditor };
+            _maskEditorWindow.Closed += (_, _) =>
+            {
+                _maskEditorWindow = null;
+                vm.IsMaskEnabled = false;
+            };
+            _maskEditorWindow.Show(this);
+        }
+        else if (_maskEditorWindow is not null)
+        {
+            _maskEditorWindow.Close();
+            _maskEditorWindow = null;
+        }
     }
 
     /// <summary>Gives the window access to settings for window-state persistence.</summary>

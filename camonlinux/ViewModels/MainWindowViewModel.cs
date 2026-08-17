@@ -14,6 +14,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using camonlinux.Capture;
+using camonlinux.Masking;
+using camonlinux.Masking.Effects;
 using camonlinux.Models;
 using camonlinux.Services;
 using camonlinux.Views;
@@ -218,6 +220,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private string _selectedBurstCount = "Unlimited";
     [ObservableProperty] private string _busyText = "Working…";
     [ObservableProperty] private bool _isVideoMode;
+    [ObservableProperty] private bool _isMaskEnabled;
 
     public MainWindowViewModel(
         ICaptureService capture,
@@ -296,7 +299,31 @@ public partial class MainWindowViewModel : ViewModelBase
         // would otherwise be filtered out as unavailable.
 
         _capture.ErrorOccurred += (_, message) => StatusMessage = message;
+
+        // Mask pipeline: shape / gradient / chroma / feather / colour-adjustment.
+        // Settings are shared with the Mask Editor so slider changes apply live.
+        // (Effects run in list order; the feather blurs the mask built before it,
+        // and the colour adjustment runs last in Adjustment mode.)
+        var shape = new ShapeMaskSettings();
+        var gradient = new GradientMaskSettings();
+        var feather = new FeatherMaskSettings();
+        var adjustment = new ColorAdjustmentMaskSettings();
+        var chroma = new ChromaKeyMaskSettings();
+        var pipeline = new MaskPipeline();
+        pipeline.Effects.Add(new ShapeMaskEffect(shape));
+        pipeline.Effects.Add(new GradientMaskEffect(gradient));
+        pipeline.Effects.Add(new ChromaKeyMaskEffect(chroma));
+        pipeline.Effects.Add(new FeatherMaskEffect(feather));
+        pipeline.Effects.Add(new ColorAdjustmentMaskEffect(adjustment));
+        MaskPipeline = pipeline;
+        MaskEditor = new MaskEditorViewModel(pipeline, shape, gradient, feather, adjustment, chroma);
     }
+
+    /// <summary>The real-time masking pipeline (applied to each preview frame on the streaming thread).</summary>
+    public MaskPipeline MaskPipeline { get; }
+
+    /// <summary>View model for the Mask Editor window (shares the pipeline + settings).</summary>
+    public MaskEditorViewModel MaskEditor { get; }
 
     private void LoadEffects()
     {

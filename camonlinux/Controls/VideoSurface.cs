@@ -12,12 +12,30 @@ namespace camonlinux.Controls;
 
 /// <summary>
 /// Renders <see cref="CameraFrame"/>s coming from the capture service into a
-/// <see cref="WriteableBitmap"/>, letterboxed to preserve aspect ratio.
+/// <see cref="WriteableBitmap"/>, letterboxed to preserve aspect ratio. A checkerboard
+/// is drawn behind the video so alpha-masked (transparent) areas are visible.
 /// </summary>
 public sealed class VideoSurface : Control
 {
     private readonly object _sync = new();
     private WriteableBitmap? _bitmap;
+    private static readonly DrawingBrush s_checker = CreateChecker();
+
+    private static DrawingBrush CreateChecker()
+    {
+        const double size = 16;
+        var dark = new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24));
+        var light = new SolidColorBrush(Color.FromRgb(0x3a, 0x3a, 0x3a));
+        var group = new DrawingGroup();
+        group.Children.Add(new GeometryDrawing { Brush = dark, Geometry = new RectangleGeometry(new Rect(0, 0, size * 2, size * 2)) });
+        group.Children.Add(new GeometryDrawing { Brush = light, Geometry = new RectangleGeometry(new Rect(0, 0, size, size)) });
+        group.Children.Add(new GeometryDrawing { Brush = light, Geometry = new RectangleGeometry(new Rect(size, size, size, size)) });
+        return new DrawingBrush(group)
+        {
+            TileMode = TileMode.Tile,
+            DestinationRect = new RelativeRect(0, 0, size * 2, size * 2, RelativeUnit.Absolute)
+        };
+    }
 
     /// <summary>Called from the GStreamer streaming thread; marshals to the UI thread.</summary>
     public void PushFrame(CameraFrame frame)
@@ -68,6 +86,9 @@ public sealed class VideoSurface : Control
 
         if (bitmap is null || Bounds.Width <= 0 || Bounds.Height <= 0)
             return;
+
+        // Checkerboard behind the video so alpha-masked areas are visible.
+        context.DrawRectangle(s_checker, null, new Rect(0, 0, Bounds.Width, Bounds.Height));
 
         var source = new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
         var scale = Math.Min(Bounds.Width / source.Width, Bounds.Height / source.Height);

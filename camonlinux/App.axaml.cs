@@ -44,7 +44,7 @@ public partial class App : Application
             {
                 DataContext = viewModel
             };
-            window.ConnectCapture(capture);
+            window.ConnectCapture(capture, viewModel.MaskPipeline);
             window.SetSettings(settings);
 
             desktop.MainWindow = window;

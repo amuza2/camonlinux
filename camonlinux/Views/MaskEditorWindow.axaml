@@ -1,0 +1,260 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:camonlinux.ViewModels"
+        x:Class="camonlinux.Views.MaskEditorWindow"
+        x:DataType="vm:MaskEditorViewModel"
+        Title="Mask Editor"
+        Width="560" Height="680"
+        MinWidth="480" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+    <DockPanel>
+        <!-- Global controls -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ToggleButton IsChecked="{Binding Enabled}" Content="Enable mask"/>
+                <TextBlock Text="Mode" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding MaskModeOptions}" SelectedIndex="{Binding ModeIndex}" Width="150"/>
+                <ToggleButton IsChecked="{Binding Invert}" Content="Invert"/>
+            </StackPanel>
+        </Border>
+
+        <TabControl Margin="8">
+            <!-- ============ SHAPE ============ -->
+            <TabItem Header="Shape">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Margin="8">
+                        <ComboBox ItemsSource="{Binding ShapeOptions}" SelectedIndex="{Binding ShapeIndex}" HorizontalAlignment="Stretch"/>
+
+                        <TextBlock Text="Position / Scale" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Center X" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <Slider Value="{Binding Shape.CenterX}" Minimum="0" Maximum="100" Width="120"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Center Y" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <Slider Value="{Binding Shape.CenterY}" Minimum="0" Maximum="100" Width="120"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Scale type" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox ItemsSource="{Binding ScaleTypeOptions}" SelectedIndex="{Binding ScaleTypeIndex}" Width="86"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Scale" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <Slider Value="{Binding Shape.Scale}" Minimum="1" Maximum="100" Width="120"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWidthScale}">
+                                <TextBlock Text="Width px" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding Shape.WidthPx}" Width="70"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsHeightScale}">
+                                <TextBlock Text="Height px" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding Shape.HeightPx}" Width="70"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Pos X" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Shape.PositionX}" Minimum="-500" Maximum="500" Width="110"/>
+                            <TextBlock Text="Pos Y" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Shape.PositionY}" Minimum="-500" Maximum="500" Width="110"/>
+                            <TextBlock Text="Scale" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Shape.SceneScale}" Minimum="0.1" Maximum="5" Width="110"/>
+                            <Button Content="Recenter" Command="{Binding RecenterShapeCommand}"/>
+                            <ToggleButton IsChecked="{Binding Shape.FrameCheck}" Content="Frame check"/>
+                        </StackPanel>
+
+                        <!-- Rectangle -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsRectangle}">
+                            <TextBlock Text="Rectangle" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <ComboBox ItemsSource="{Binding CornerRadiusTypeOptions}" SelectedIndex="{Binding CornerTypeIndex}" Width="120"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Corner radius" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <Slider Value="{Binding Shape.CornerRadius}" Minimum="0" Maximum="300" Width="140"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsCustomCorners}">
+                                <TextBlock Text="TL" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.CornerTl}" Minimum="0" Maximum="300" Width="90"/>
+                                <TextBlock Text="TR" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.CornerTr}" Minimum="0" Maximum="300" Width="90"/>
+                                <TextBlock Text="BL" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.CornerBl}" Minimum="0" Maximum="300" Width="90"/>
+                                <TextBlock Text="BR" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.CornerBr}" Minimum="0" Maximum="300" Width="90"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Circle -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsCircle}">
+                            <TextBlock Text="Circle radius %" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Shape.Radius}" Minimum="1" Maximum="200" Width="160"/>
+                        </StackPanel>
+
+                        <!-- Ellipse -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsEllipse}">
+                            <TextBlock Text="Ellipse" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Width" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.EllipseWidth}" Minimum="20" Maximum="400" Width="120"/>
+                                <TextBlock Text="Height" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.EllipseHeight}" Minimum="20" Maximum="400" Width="120"/>
+                                <TextBlock Text="Rot°" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.EllipseRotation}" Minimum="-180" Maximum="180" Width="120"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Regular polygon -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsPolygon}">
+                            <TextBlock Text="Regular Polygon" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Sides" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding Shape.Sides}" Minimum="3" Maximum="24" Width="70"/>
+                                <TextBlock Text="Radius %" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.PolygonRadius}" Minimum="1" Maximum="200" Width="100"/>
+                                <TextBlock Text="Corner" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.PolygonCornerRadius}" Minimum="0" Maximum="120" Width="100"/>
+                                <TextBlock Text="Rot°" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.PolygonRotation}" Minimum="-180" Maximum="180" Width="100"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Star -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsStar}">
+                            <TextBlock Text="Star" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Points" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding Shape.StarPoints}" Minimum="3" Maximum="24" Width="70"/>
+                                <TextBlock Text="Outer %" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.StarOuter}" Minimum="1" Maximum="200" Width="100"/>
+                                <TextBlock Text="Inner %" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.StarInner}" Minimum="1" Maximum="200" Width="100"/>
+                                <TextBlock Text="Rot°" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.StarRotation}" Minimum="-180" Maximum="180" Width="100"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Heart -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsHeart}">
+                            <TextBlock Text="Heart size %" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Shape.HeartSize}" Minimum="1" Maximum="200" Width="160"/>
+                            <TextBlock Text="Rot°" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.HeartRotation}" Minimum="-180" Maximum="180" Width="120"/>
+                        </StackPanel>
+
+                        <!-- Superformula -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsSuperformula}">
+                            <TextBlock Text="Superformula" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <ComboBox ItemsSource="{Binding SuperformulaModeOptions}" SelectedIndex="{Binding SuperModeIndex}" Width="140"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="a" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.A}" Minimum="0.1" Maximum="5" Width="90"/>
+                                <TextBlock Text="b" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.B}" Minimum="0.1" Maximum="5" Width="90"/>
+                                <TextBlock Text="m" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.M}" Minimum="1" Maximum="16" Width="90"/>
+                                <TextBlock Text="n1" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.N1}" Minimum="0.1" Maximum="10" Width="90"/>
+                                <TextBlock Text="n2" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.N2}" Minimum="0.1" Maximum="10" Width="90"/>
+                                <TextBlock Text="n3" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Shape.N3}" Minimum="0.1" Maximum="10" Width="90"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Feather" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <ComboBox ItemsSource="{Binding FeatherTypeOptions}" SelectedIndex="{Binding FeatherTypeIndex}" Width="96"/>
+                            <Slider Value="{Binding Shape.FeatherAmount}" Minimum="1" Maximum="100" Width="120"/>
+                        </StackPanel>
+
+                        <Button Content="Reset shape" Command="{Binding ResetShapeCommand}" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ GRADIENT ============ -->
+            <TabItem Header="Gradient">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="10" Margin="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Width px" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Gradient.Width}" Minimum="10" Maximum="1000" Width="200"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Position" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Gradient.Position}" Minimum="-500" Maximum="500" Width="200"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Rotation°" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Gradient.Rotation}" Minimum="-180" Maximum="180" Width="200"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <ToggleButton IsChecked="{Binding Gradient.Invert}" Content="Invert"/>
+                            <ToggleButton IsChecked="{Binding Gradient.DebugLines}" Content="Debug lines"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ CHROMA KEY ============ -->
+            <TabItem Header="Chroma">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Margin="8">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <ToggleButton IsChecked="{Binding Chroma.ShowMatte}" Content="Show matte"/>
+                            <ToggleButton IsChecked="{Binding Chroma.DoubleColor}" Content="Double color"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Key color (RGB)" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="R" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyR}" Minimum="0" Maximum="255" Width="100"/>
+                            <TextBlock Text="G" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyG}" Minimum="0" Maximum="255" Width="100"/>
+                            <TextBlock Text="B" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyB}" Minimum="0" Maximum="255" Width="100"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Chroma.DoubleColor}">
+                            <TextBlock Text="R2" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyR2}" Minimum="0" Maximum="255" Width="100"/>
+                            <TextBlock Text="G2" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyG2}" Minimum="0" Maximum="255" Width="100"/>
+                            <TextBlock Text="B2" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/><Slider Value="{Binding Chroma.KeyB2}" Minimum="0" Maximum="255" Width="100"/>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="6">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Similarity" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="0" Grid.Column="1" Value="{Binding Chroma.Similarity}" Minimum="0" Maximum="100" Width="150"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Smoothness" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="0" Grid.Column="3" Value="{Binding Chroma.Smoothness}" Minimum="0" Maximum="100" Width="150"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Spill" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="1" Grid.Column="1" Value="{Binding Chroma.SpillReduction}" Minimum="0" Maximum="100" Width="150"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="Opacity" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="1" Grid.Column="3" Value="{Binding Chroma.Opacity}" Minimum="0" Maximum="100" Width="150"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Contrast" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="2" Grid.Column="1" Value="{Binding Chroma.Contrast}" Minimum="-100" Maximum="100" Width="150"/>
+                            <TextBlock Grid.Row="2" Grid.Column="2" Text="Brightness" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="2" Grid.Column="3" Value="{Binding Chroma.Brightness}" Minimum="-100" Maximum="100" Width="150"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Gamma" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Chroma.Gamma}" Minimum="50" Maximum="150" Width="200"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ ADJUSTMENT ============ -->
+            <TabItem Header="Adjust">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Margin="8">
+                        <TextBlock Text="Brightness" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Text="Min" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="1" Value="{Binding Adjustment.BrightnessMin}" Minimum="-100" Maximum="100" Width="180"/>
+                            <TextBlock Grid.Column="2" Text="Max" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="3" Value="{Binding Adjustment.BrightnessMax}" Minimum="-100" Maximum="100" Width="180"/>
+                        </Grid>
+                        <TextBlock Text="Contrast" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Text="Min" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="1" Value="{Binding Adjustment.ContrastMin}" Minimum="-100" Maximum="100" Width="180"/>
+                            <TextBlock Grid.Column="2" Text="Max" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="3" Value="{Binding Adjustment.ContrastMax}" Minimum="-100" Maximum="100" Width="180"/>
+                        </Grid>
+                        <TextBlock Text="Saturation" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Text="Min" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="1" Value="{Binding Adjustment.SaturationMin}" Minimum="-100" Maximum="100" Width="180"/>
+                            <TextBlock Grid.Column="2" Text="Max" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="3" Value="{Binding Adjustment.SaturationMax}" Minimum="-100" Maximum="100" Width="180"/>
+                        </Grid>
+                        <TextBlock Text="Hue shift" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Text="Min" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="1" Value="{Binding Adjustment.HueShiftMin}" Minimum="-180" Maximum="180" Width="180"/>
+                            <TextBlock Grid.Column="2" Text="Max" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="3" Value="{Binding Adjustment.HueShiftMax}" Minimum="-180" Maximum="180" Width="180"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
