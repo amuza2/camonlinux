@@ -24,6 +24,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private Timer? _recordingTimer;
     private Timer? _burstTimer;
     private string? _sampleImagePath;
+    private bool _generatingThumbnails;
 
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
@@ -395,8 +396,21 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>Generates thumbnails for gallery items (photos and videos), cached on disk.</summary>
     private async Task GenerateGalleryThumbnailsAsync()
     {
-        foreach (var item in GalleryItems.ToList())
-            await EnsureMediaThumbnailAsync(item);
+        if (_generatingThumbnails)
+            return;
+        _generatingThumbnails = true;
+        try
+        {
+            var items = GalleryItems.ToList();
+            await Parallel.ForEachAsync(
+                items,
+                new ParallelOptions { MaxDegreeOfParallelism = 3 },
+                async (item, _) => await EnsureMediaThumbnailAsync(item));
+        }
+        finally
+        {
+            _generatingThumbnails = false;
+        }
     }
 
     private async Task EnsureMediaThumbnailAsync(MediaItem item)

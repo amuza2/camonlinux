@@ -280,33 +280,71 @@ public sealed class GStreamerCaptureService : ICaptureService
     {
         try
         {
-            // Run a short one-shot pipeline: sample image -> effect -> scaled PNG.
+            // One-shot pipeline that decodes the source and outputs a scaled BGRx frame.
+            // We pull a SINGLE frame via appsink and stop immediately — otherwise
+            // decodebin would decode the entire (possibly huge) video.
             var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
             var description =
                 $"filesrc location=\"{sampleImagePath}\" ! decodebin ! videoconvert{effectChain} " +
-                // Normalize the effect output, scale, then convert to PNG format.
-                // (Do NOT force format in the same caps as width/height — that breaks
-                // negotiation for effects like agingtv that emit a different format.)
                 $"! videoconvert ! videoscale ! video/x-raw,width={width},height={height} " +
-                $"! videoconvert ! pngenc ! filesink location=\"{outputPath}\"";
+                "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
 
             var pipeline = Gst.Functions.ParseLaunch(description);
             if (pipeline is null)
                 return Task.FromResult<string?>(null);
 
+            var bin = (Gst.Bin)pipeline;
+            var appsink = bin.GetByName("sink") as AppSink
+                ?? throw new InvalidOperationException("Failed to create the thumbnail appsink.");
+
             pipeline.SetState(Gst.State.Playing);
-            using var bus = pipeline.GetBus();
-            if (bus is not null)
+
+            // Wait (up to 8s) for the first decoded frame, then stop decoding.
+            using var sample = appsink.TryPullSample((Gst.ClockTime)8_000_000_000UL);
+            byte[]? data = null;
+            var w = 0;
+            var h = 0;
+            if (sample is not null)
             {
-                using var _ = bus.TimedPopFiltered(
-                    (Gst.ClockTime)8_000_000_000UL,
-                    Gst.MessageType.Eos | Gst.MessageType.Error);
+                using var buffer = sample.GetBuffer();
+                if (buffer is not null)
+                {
+                    var size = (int)buffer.GetSize();
+                    data = new byte[size];
+                    buffer.Extract(0, data);
+
+                    using var caps = sample.GetCaps();
+                    if (caps is not null)
+                    {
+                        var structure = caps.GetStructure(0);
+                        if (structure is not null)
+                        {
+                            structure.GetInt("width", out w);
+                            structure.GetInt("height", out h);
+                        }
+                    }
+                }
             }
+
             pipeline.SetState(Gst.State.Null);
             pipeline.Dispose();
 
-            return Task.FromResult<string?>(
-                File.Exists(outputPath) && new FileInfo(outputPath).Length > 0 ? outputPath : null);
+            if (data is null || w <= 0 || h <= 0)
+                return Task.FromResult<string?>(null);
+
+            // BGRx has an unused alpha byte; force it opaque, then encode a PNG.
+            for (var i = 3; i < data.Length; i += 4)
+                data[i] = 0xFF;
+
+            var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            using var bitmap = new SKBitmap(info);
+            Marshal.Copy(data, 0, bitmap.GetPixels(), data.Length);
+            using var image = SKImage.FromBitmap(bitmap);
+            using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var stream = File.Create(outputPath);
+            encoded.SaveTo(stream);
+
+            return Task.FromResult<string?>(outputPath);
         }
         catch
         {
