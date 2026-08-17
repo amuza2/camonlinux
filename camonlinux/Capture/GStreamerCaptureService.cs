@@ -43,6 +43,19 @@ public sealed class GStreamerCaptureService : ICaptureService
 {
     private static bool s_gstInitialized;
 
+    // Capture modes offered in the UI. High-res modes must use MJPEG (many UVC
+    // cams — e.g. the Logitech C930e — cannot stream raw 720p/1080p), so those
+    // insert a jpegdec after v4l2src. CheckType/W/H are used to test whether the
+    // device supports the mode via a fast caps query (no streaming).
+    private static readonly (string Label, string Caps, string CheckType, int W, int H, bool Jpeg)[] s_modes =
+    {
+        ("1920×1080 @ 30", "image/jpeg,width=1920,height=1080,framerate=30/1", "image/jpeg", 1920, 1080, true),
+        ("1280×720 @ 30", "image/jpeg,width=1280,height=720,framerate=30/1", "image/jpeg", 1280, 720, true),
+        ("960×540 @ 30", "image/jpeg,width=960,height=540,framerate=30/1", "image/jpeg", 960, 540, true),
+        ("640×480 @ 30", "video/x-raw,width=640,height=480,framerate=30/1", "video/x-raw", 640, 480, false),
+        ("640×360 @ 30", "video/x-raw,width=640,height=360,framerate=30/1", "video/x-raw", 640, 360, false),
+    };
+
     private Element? _previewPipeline;
     private AppSink? _appSink;
     private Element? _recordQueue;
@@ -51,6 +64,14 @@ public sealed class GStreamerCaptureService : ICaptureService
     private Element? _micVolume;
     private string? _audioSource;
     private bool _micMuted;
+    private string _resolution = "";
+    private string _recordQuality = "medium";
+    private long _maxFileSizeMB;
+    private readonly Dictionary<string, IReadOnlyList<string>> _modeCache = new();
+    private readonly Stopwatch _recSizeStopwatch = new();
+    private readonly SemaphoreSlim _recordingGate = new(1, 1);
+    private string? _recordPath;
+    private bool _splitting;
     private CameraDevice? _currentDevice;
     private CameraFrame? _latestFrame;
     private Gst.Bus? _bus;
@@ -86,6 +107,15 @@ public sealed class GStreamerCaptureService : ICaptureService
             }
         }
     }
+
+    /// <summary>Selected capture mode label ("" or "Default" = camera default).</summary>
+    public string Resolution { get => _resolution; set => _resolution = value ?? ""; }
+
+    /// <summary>Recording quality key: "low", "medium" or "high" (maps to x264 bitrate).</summary>
+    public string RecordQuality { get => _recordQuality; set => _recordQuality = value ?? "medium"; }
+
+    /// <summary>Split recordings at this size (MB); 0 = no limit.</summary>
+    public long MaxFileSizeMB { get => _maxFileSizeMB; set => _maxFileSizeMB = value; }
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -197,6 +227,93 @@ public sealed class GStreamerCaptureService : ICaptureService
     }
 
     // ------------------------------------------------------------------ //
+    // Capture modes (resolution / framerate)
+    // ------------------------------------------------------------------ //
+
+    /// <summary>
+    /// Returns the labels of the capture modes the given device actually supports.
+    /// Determined with a fast caps query (device opened at READY, no streaming) so
+    /// it can run even while another pipeline is using the camera. Cached per device.
+    /// </summary>
+    public IReadOnlyList<string> GetSupportedModes(CameraDevice device)
+    {
+        if (_modeCache.TryGetValue(device.Id, out var cached))
+            return cached;
+
+        var list = new List<string>();
+        foreach (var (_, _, checkType, w, h, _) in s_modes)
+        {
+            if (ModeNegotiates(device, checkType, w, h))
+                list.Add(LabelFor(checkType, w, h));
+        }
+        _modeCache[device.Id] = list;
+        return list;
+    }
+
+    private static string LabelFor(string type, int w, int h)
+    {
+        foreach (var (label, caps, checkType, cw, ch, _) in s_modes)
+            if (checkType == type && cw == w && ch == h)
+                return label;
+        return $"{w}×{h} @ 30";
+    }
+
+    /// <summary>True if the device reports a caps structure with the given type/size.</summary>
+    private static bool ModeNegotiates(CameraDevice device, string mediaType, int width, int height)
+    {
+        try
+        {
+            using var src = Gst.ElementFactory.Make("v4l2src", null);
+            if (src is null)
+                return false;
+            src.SetProperty("device", new GObject.Value(device.Path));
+            src.SetState(Gst.State.Ready);
+            using var caps = src.GetStaticPad("src")?.QueryCaps(null);
+            if (caps is null)
+                return false;
+            for (uint i = 0; i < caps.GetSize(); i++)
+            {
+                using var s = caps.GetStructure(i);
+                if (s is null || s.GetName() != mediaType)
+                    continue;
+                s.GetInt("width", out var w);
+                s.GetInt("height", out var h);
+                if (w == width && h == height)
+                    return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The v4l2src prefix for the current capture mode: optionally adds the mode's
+    /// caps (and a jpegdec for MJPEG high-res modes). Empty resolution = default.
+    /// </summary>
+    private string SourcePrefix()
+    {
+        var mode = CurrentMode();
+        if (mode is null)
+            return $"v4l2src device={_currentDevice!.Path}";
+        return mode.Value.Jpeg
+            ? $"v4l2src device={_currentDevice!.Path} ! {mode.Value.Caps} ! jpegdec"
+            : $"v4l2src device={_currentDevice!.Path} ! {mode.Value.Caps}";
+    }
+
+    private (string Caps, bool Jpeg)? CurrentMode()
+    {
+        if (string.IsNullOrEmpty(_resolution) || _resolution == "Default")
+            return null;
+        foreach (var (label, caps, _, _, _, jpeg) in s_modes)
+            if (label == _resolution)
+                return (caps, jpeg);
+        return null;
+    }
+
+    // ------------------------------------------------------------------ //
     // Preview
     // ------------------------------------------------------------------ //
 
@@ -233,6 +350,7 @@ public sealed class GStreamerCaptureService : ICaptureService
         _recordFileSink = null;
         _audioQueue = null;
         _micVolume = null;
+        _recordPath = null;
 
         DisposeBus();
 
@@ -261,7 +379,7 @@ public sealed class GStreamerCaptureService : ICaptureService
         // A trailing videoconvert lets effects (e.g. frei0r filters) negotiate their
         // preferred format and still bridge to the BGRx caps the appsink needs.
         return
-            $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} " +
+            $"{SourcePrefix()} ! videoconvert ! {flip}{effectChain} " +
             "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
     }
 
@@ -275,10 +393,12 @@ public sealed class GStreamerCaptureService : ICaptureService
               "! audioresample ! audio/x-raw,rate=48000,channels=2 ! fdkaacenc bitrate=128000 " +
               "! queue name=audq ! mux. "
             : "";
+        // x264enc's bitrate is in kbit/s.
+        var bitrate = _recordQuality switch { "low" => 500, "high" => 5_000, _ => 1_500 };
         return
-            $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} ! tee name=t " +
+            $"{SourcePrefix()} ! videoconvert ! {flip}{effectChain} ! tee name=t " +
             "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
-            "t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency " +
+            $"t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency bitrate={bitrate} " +
             $"! matroskamux name=mux ! filesink name=filesink location=\"{path}\"{audio}";
     }
 
@@ -417,70 +537,94 @@ public sealed class GStreamerCaptureService : ICaptureService
     // Recording
     // ------------------------------------------------------------------ //
 
-    public Task StartRecordingAsync(string path)
+    public async Task StartRecordingAsync(string path)
     {
-        if (_recordQueue is not null)
-            return Task.CompletedTask; // already recording
-
-        if (_currentDevice is null)
-            throw new InvalidOperationException("No camera selected.");
-
-        // Rebuild the pipeline to add the recording branch — the preview stays live.
-        StopPreviewInternal();
-
-        var withAudio = _audioSource is not null;
-        if (!TryBuildPipeline(RecordingDescription(Effect, path, withAudio)) && withAudio)
+        await _recordingGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            // Audio branch failed (no sound device reachable) — retry without sound.
-            ErrorOccurred?.Invoke(this, "No audio input available; recording without sound.");
-            TryBuildPipeline(RecordingDescription(Effect, path, false));
-        }
+            if (_recordQueue is not null)
+                return; // already recording
 
-        if (_previewPipeline is not null)
-        {
-            _previewPipeline.SetState(Gst.State.Playing);
-        }
-        else
-        {
-            // Recording branch failed (e.g. missing encoder) — resume plain preview.
-            ErrorOccurred?.Invoke(this, "Could not start recording (missing encoder?); preview continues.");
-            BuildPreviewPipeline();
-            _previewPipeline?.SetState(Gst.State.Playing);
-        }
+            if (_currentDevice is null)
+                throw new InvalidOperationException("No camera selected.");
 
-        return Task.CompletedTask;
+            _recordPath = null;
+            _recSizeStopwatch.Restart();
+            _splitting = false;
+
+            // Make sure the target folder exists (filesink fails otherwise).
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            // Rebuild the pipeline to add the recording branch — the preview stays live.
+            StopPreviewInternal();
+
+            // Set AFTER StopPreviewInternal (it clears _recordPath).
+            _recordPath = path;
+
+            var withAudio = _audioSource is not null;
+            if (!TryBuildPipeline(RecordingDescription(Effect, path, withAudio)) && withAudio)
+            {
+                // Audio branch failed (no sound device reachable) — retry without sound.
+                ErrorOccurred?.Invoke(this, "No audio input available; recording without sound.");
+                TryBuildPipeline(RecordingDescription(Effect, path, false));
+            }
+
+            if (_previewPipeline is not null)
+            {
+                _previewPipeline.SetState(Gst.State.Playing);
+            }
+            else
+            {
+                // Recording branch failed (e.g. missing encoder) — resume plain preview.
+                ErrorOccurred?.Invoke(this, "Could not start recording (missing encoder?); preview continues.");
+                BuildPreviewPipeline();
+                _previewPipeline?.SetState(Gst.State.Playing);
+            }
+        }
+        finally
+        {
+            _recordingGate.Release();
+        }
     }
 
     public async Task StopRecordingAsync()
     {
-        var recordQueue = _recordQueue;
-        if (recordQueue is null)
-            return; // not recording
-
-        StopBusWatch();
-
-        // EOS down both record branches lets x264enc/fdkaacenc flush and
-        // matroskamux finalize the container (the preview branch runs until teardown).
-        recordQueue.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
-        _audioQueue?.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
-
-        // Wait for the muxer to finalize the file.
-        if (_bus is not null)
+        await _recordingGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            using var _ = _bus.TimedPopFiltered(
-                (Gst.ClockTime)3_000_000_000UL,
-                Gst.MessageType.Eos | Gst.MessageType.Error);
-        }
+            var recordQueue = _recordQueue;
+            if (recordQueue is null)
+                return; // not recording
 
-        // Tear down and resume the plain (idle) preview.
-        StopPreviewInternal();
-        if (_currentDevice is not null)
+            StopBusWatch();
+
+            // EOS down both record branches lets x264enc/fdkaacenc flush and
+            // matroskamux finalize the container (the preview branch runs until teardown).
+            recordQueue.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
+            _audioQueue?.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
+
+            // Wait for the muxer to finalize the file.
+            if (_bus is not null)
+            {
+                using var _ = _bus.TimedPopFiltered(
+                    (Gst.ClockTime)3_000_000_000UL,
+                    Gst.MessageType.Eos | Gst.MessageType.Error);
+            }
+
+            // Tear down and resume the plain (idle) preview.
+            StopPreviewInternal();
+            if (_currentDevice is not null)
+            {
+                BuildPreviewPipeline();
+                _previewPipeline?.SetState(Gst.State.Playing);
+            }
+        }
+        finally
         {
-            BuildPreviewPipeline();
-            _previewPipeline?.SetState(Gst.State.Playing);
+            _recordingGate.Release();
         }
-
-        await Task.CompletedTask;
     }
 
     // ------------------------------------------------------------------ //
@@ -519,6 +663,67 @@ public sealed class GStreamerCaptureService : ICaptureService
                 continue;
 
             ProcessSample(sample);
+            MaybeSplitRecording();
+        }
+    }
+
+    /// <summary>
+    /// When a size cap is set, checks the current recording's file size about once
+    /// a second and — if it exceeds the cap — finalizes it and continues into a
+    /// numbered next file (video_…-1.mkv, video_…-2.mkv, …). The preview keeps running.
+    /// </summary>
+    private void MaybeSplitRecording()
+    {
+        if (_maxFileSizeMB <= 0 || _recordPath is null || !IsRecording || _splitting)
+            return;
+        if (_recSizeStopwatch.ElapsedMilliseconds < 1000)
+            return;
+        _recSizeStopwatch.Restart();
+
+        try
+        {
+            var info = new FileInfo(_recordPath);
+            if (!info.Exists || info.Length < _maxFileSizeMB * 1024 * 1024)
+                return;
+        }
+        catch
+        {
+            return;
+        }
+
+        _splitting = true;
+        var nextPath = NextRecordPath(_recordPath);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await StopRecordingAsync();
+                await StartRecordingAsync(nextPath);
+                _recordPath = nextPath;
+            }
+            catch
+            {
+                // Best-effort split; the recording may simply stop here.
+            }
+            finally
+            {
+                _splitting = false;
+            }
+        });
+    }
+
+    private static string NextRecordPath(string path)
+    {
+        var dir = Path.GetDirectoryName(path) ?? "";
+        var name = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+        var index = 1;
+        while (true)
+        {
+            var candidate = Path.Combine(dir, $"{name}-{index}{ext}");
+            if (!File.Exists(candidate))
+                return candidate;
+            index++;
         }
     }
 

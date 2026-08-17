@@ -25,6 +25,15 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Mutes the microphone during recordings. Applies live while recording.</summary>
     bool MicMuted { get; set; }
 
+    /// <summary>Selected capture mode label ("" / "Default" = camera default).</summary>
+    string Resolution { get; set; }
+
+    /// <summary>Recording quality key: "low", "medium" or "high".</summary>
+    string RecordQuality { get; set; }
+
+    /// <summary>Split recordings at this size (MB); 0 = no limit.</summary>
+    long MaxFileSizeMB { get; set; }
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 
@@ -51,4 +60,9 @@ public interface ICaptureService : IAsyncDisposable
     /// registered on this system. Used to hide effects whose plugin is missing.
     /// </summary>
     bool IsElementAvailable(string elementName);
+
+    /// <summary>
+    /// Labels of the capture modes (e.g. "1920×1080 @ 30") the device supports.
+    /// </summary>
+    IReadOnlyList<string> GetSupportedModes(CameraDevice device);
 }

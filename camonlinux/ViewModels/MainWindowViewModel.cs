@@ -33,6 +33,9 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
     public ObservableCollection<EffectOption> Effects { get; } = new();
+    public ObservableCollection<string> Resolutions { get; } = new();
+    public ObservableCollection<string> QualityOptions { get; } = new() { "Low", "Medium", "High" };
+    public ObservableCollection<string> MaxSizeOptions { get; } = new() { "Unlimited", "500 MB", "1 GB", "2 GB" };
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -61,6 +64,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _micEnabled = true;
 
     [ObservableProperty]
+    private string _selectedResolution = "";
+
+    [ObservableProperty]
+    private string _selectedQuality = "Medium";
+
+    [ObservableProperty]
+    private string _selectedMaxSize = "Unlimited";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -84,6 +96,12 @@ public partial class MainWindowViewModel : ViewModelBase
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
         _micEnabled = settings.Settings.MicEnabled;
+        _selectedResolution = settings.Settings.Resolution;
+        _selectedQuality = MapQualityLabel(settings.Settings.RecordQuality);
+        _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
+        _capture.Resolution = settings.Settings.Resolution;
+        _capture.RecordQuality = settings.Settings.RecordQuality;
+        _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
 
         // Effects are loaded in InitializeAsync (after GStreamer is initialized) —
         // ElementFactory.Find returns nothing before gst_init, so frei0r effects
@@ -192,11 +210,20 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        SelectedDevice =
-            Devices.FirstOrDefault(d => d.Id == _settings.Settings.LastDeviceId)
-            ?? Devices[0];
+        _suppressDeviceSwitch = true;
+        try
+        {
+            SelectedDevice =
+                Devices.FirstOrDefault(d => d.Id == _settings.Settings.LastDeviceId)
+                ?? Devices[0];
+        }
+        finally
+        {
+            _suppressDeviceSwitch = false;
+        }
 
-        await StartPreviewAsync(SelectedDevice);
+        // Enumerates supported capture modes, then starts the preview.
+        await OnDeviceSelectedAsync(SelectedDevice);
         RefreshGallery();
         IsBusy = false;
     }
@@ -227,6 +254,30 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Enumerates the camera's supported capture modes (before the preview starts,
+    /// so the caps query can open the device), then starts the preview.
+    /// </summary>
+    private async Task OnDeviceSelectedAsync(CameraDevice device)
+    {
+        await LoadResolutionsAsync(device);
+        await StartPreviewAsync(device);
+    }
+
+    private async Task LoadResolutionsAsync(CameraDevice device)
+    {
+        var modes = await Task.Run(() => _capture.GetSupportedModes(device));
+        Resolutions.Clear();
+        Resolutions.Add("Default");
+        foreach (var mode in modes)
+            Resolutions.Add(mode);
+
+        var saved = _settings.Settings.Resolution;
+        var target = Resolutions.Contains(saved) ? saved : "Default";
+        if (!string.Equals(SelectedResolution, target, StringComparison.Ordinal))
+            SelectedResolution = target;
+    }
+
     partial void OnSelectedDeviceChanged(CameraDevice? value)
     {
         // Hot-plug may re-select the SAME camera (new instance, same id) — in that
@@ -236,7 +287,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _settings.Settings.LastDeviceId = value.Id;
         _settings.Save();
-        _ = StartPreviewAsync(value);
+        _ = OnDeviceSelectedAsync(value);
     }
 
     partial void OnMirroredChanged(bool value)
@@ -256,6 +307,38 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Save();
         _capture.MicMuted = !value;
     }
+
+    partial void OnSelectedResolutionChanged(string value)
+    {
+        if (value is null)
+            return;
+        _settings.Settings.Resolution = value;
+        _settings.Save();
+        _capture.Resolution = value;
+        // The caps are baked into the pipeline, so restart the preview.
+        if (IsPreviewActive && SelectedDevice is not null)
+            _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    partial void OnSelectedQualityChanged(string value)
+    {
+        var key = value.ToLowerInvariant() switch { "low" => "low", "high" => "high", _ => "medium" };
+        _settings.Settings.RecordQuality = key;
+        _settings.Save();
+        _capture.RecordQuality = key;
+    }
+
+    partial void OnSelectedMaxSizeChanged(string value)
+    {
+        var mb = value switch { "500 MB" => 500L, "1 GB" => 1024L, "2 GB" => 2048L, _ => 0L };
+        _settings.Settings.MaxFileSizeMB = mb;
+        _settings.Save();
+        _capture.MaxFileSizeMB = mb;
+    }
+
+    private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
+
+    private static string MapMaxSizeLabel(long mb) => mb switch { 500 => "500 MB", 1024 => "1 GB", 2048 => "2 GB", _ => "Unlimited" };
 
     partial void OnSelectedEffectChanged(EffectOption? value)
     {

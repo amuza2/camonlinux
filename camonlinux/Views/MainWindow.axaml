@@ -40,12 +40,17 @@
                     </Button>
                 </StackPanel>
 
-                <ComboBox ItemsSource="{Binding Devices}"
-                          SelectedItem="{Binding SelectedDevice}"
-                          PlaceholderText="Select a camera"
-                          HorizontalAlignment="Stretch"
-                          MaxWidth="360"
-                          DisplayMemberBinding="{Binding Name}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox ItemsSource="{Binding Devices}"
+                              SelectedItem="{Binding SelectedDevice}"
+                              PlaceholderText="Select a camera"
+                              Width="300"
+                              DisplayMemberBinding="{Binding Name}"/>
+                    <ComboBox ItemsSource="{Binding Resolutions}"
+                              SelectedItem="{Binding SelectedResolution}"
+                              Width="160"
+                              ToolTip.Tip="Capture resolution (per camera)"/>
+                </StackPanel>
             </DockPanel>
         </Border>
 
@@ -126,6 +131,10 @@
                         <TextBlock Text="Mic"/>
                     </StackPanel>
                 </ToggleButton>
+                <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}"
+                          Width="88" ToolTip.Tip="Recording quality"/>
+                <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}"
+                          Width="100" ToolTip.Tip="Auto-split recordings at this size"/>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"

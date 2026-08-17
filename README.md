@@ -14,6 +14,8 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - **Effects gallery** — 25 built-in GStreamer effects plus up to 17 **frei0r** filters (cartoon, posterize, pixelate, RGB split, glitch, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame
 - Record videos (H.264 + AAC, Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
 - **Audio in recordings** — captures the default microphone (PipeWire/Pulse/ALSA via `autoaudiosrc`) as AAC, with a **Mic** toggle for live mute (applies even mid-recording)
+- **Resolution / FPS selector** — a per-camera dropdown of the modes the device actually supports (e.g. 1920×1080 @ 30, 1280×720 @ 30, 640×480 @ 30), detected from the device caps. High-res modes use the camera's MJPEG stream + `jpegdec`, since many UVC cams (incl. the C930e) can't do raw 720p/1080p
+- **Record quality + auto-split** — Low/Med/High `x264enc` bitrate, and an optional size cap that splits long recordings into numbered parts (`video_…-1.mkv`, `video_…-2.mkv`) without stopping the preview
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
@@ -101,12 +103,12 @@ A single GStreamer pipeline drives both preview and recording:
 
 ```
 # Preview (idle)
-v4l2src ! videoconvert ! videoflip (mirror) ! {effect} ! videoconvert ! video/x-raw,format=BGRx ! appsink
+v4l2src {+ selected mode caps; + jpegdec for MJPEG} ! videoconvert ! videoflip (mirror) ! {effect} ! videoconvert ! video/x-raw,format=BGRx ! appsink
 
 # Recording (pipeline rebuilt with a tee; preview stays LIVE)
-v4l2src ! videoconvert ! videoflip ! {effect} ! tee
+v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
     ├─ queue ! videoconvert ! video/x-raw,format=BGRx ! appsink      → live preview
-    └─ queue ! x264enc ! matroskamux ! filesink                       → MKV recording
+    └─ queue ! x264enc (bitrate by quality) ! matroskamux ! filesink   → MKV recording
        autoaudiosrc ! volume(mute) ! fdkaacenc ! mux.                  → mic audio (AAC)
 ```
 
@@ -116,12 +118,17 @@ v4l2src ! videoconvert ! videoflip ! {effect} ! tee
   live preview keeps running while recording.
 - Stopping sends EOS down the record branch only — the Matroska container is
   finalized properly — then rebuilds back to the plain preview.
+- When a size cap is set, the recording file is watched and, once it exceeds the
+  cap, finalized and continued into a numbered next file without stopping the
+  preview.
 
 ## Roadmap / next steps
 
 - [x] Device hot-plug detection (poll `/dev/video*` every 2 s)
 - [x] frei0r effects (install `frei0r-plugins` + `gst-plugins-bad`) — auto-detected
 - [x] Audio in recordings (default mic → AAC; `Mic` toggle mutes live)
+- [x] Resolution / FPS selector (per-camera; MJPEG for high-res modes)
+- [x] Record quality (Low/Med/High) + auto-split at a size cap
 - [ ] AppStream metainfo + AUR PKGBUILD
 - [ ] i18n
 
