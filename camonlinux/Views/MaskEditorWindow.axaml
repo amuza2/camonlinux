@@ -25,6 +25,7 @@
                     <ToggleButton IsChecked="{Binding GradientEnabled}" Content="Gradient"/>
                     <ToggleButton IsChecked="{Binding ChromaEnabled}" Content="Chroma"/>
                     <ToggleButton IsChecked="{Binding SvgEnabled}" Content="SVG"/>
+                    <ToggleButton IsChecked="{Binding BsmEnabled}" Content="BSM"/>
                     <ToggleButton IsChecked="{Binding FeatherEnabled}" Content="Feather"/>
                     <ToggleButton IsChecked="{Binding AdjustmentEnabled}" Content="Adjust"/>
                 </StackPanel>
@@ -275,6 +276,29 @@
                             <TextBlock Text="Pos Y" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                             <Slider Value="{Binding Svg.PositionY}" Minimum="-1000" Maximum="1000" Width="120"/>
                         </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ BSM ============ -->
+            <TabItem Header="BSM">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8" Margin="8">
+                        <TextBlock Text="Alpha wipe: reveals content as the scene changes from a stored background."
+                                   TextWrapping="Wrap" Foreground="#AAAAAA" FontSize="12"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Capture background" Classes="accent" Command="{Binding CaptureBsmBackgroundCommand}"/>
+                            <Button Content="Reset background" Command="{Binding ResetBsmBackgroundCommand}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Threshold" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Bsm.Threshold}" Minimum="0" Maximum="255" Width="200"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Fade-out time (s)" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding Bsm.FadeOutTime}" Minimum="0.1" Maximum="5" Width="200"/>
+                        </StackPanel>
+                        <ToggleButton IsChecked="{Binding Bsm.FreezeFrame}" Content="Freeze frame (no live updates)"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

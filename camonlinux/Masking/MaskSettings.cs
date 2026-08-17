@@ -198,3 +198,21 @@ public partial class SvgMaskSettings : ObservableObject
         PositionX = 0; PositionY = 0; Invert = false;
     }
 }
+
+/// <summary>
+/// Parameters for the BSM (background-subtraction / alpha-wipe) mask.
+/// </summary>
+public partial class BsmMaskSettings : ObservableObject
+{
+    [ObservableProperty] private double _fadeOutTime = 0.5;  // seconds to fade a wiped area back
+    [ObservableProperty] private double _threshold = 40;      // 0..255 per-channel diff to count as "changed"
+    [ObservableProperty] private bool _freezeFrame;
+    [ObservableProperty] private bool _captureBackground;     // one-shot trigger, consumed by the effect
+    [ObservableProperty] private bool _resetBackground;       // one-shot trigger, consumed by the effect
+
+    public void Reset()
+    {
+        FadeOutTime = 0.5; Threshold = 40; FreezeFrame = false;
+        CaptureBackground = false; ResetBackground = false;
+    }
+}
