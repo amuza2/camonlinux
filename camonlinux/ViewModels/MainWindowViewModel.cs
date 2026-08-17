@@ -152,7 +152,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
         _micEnabled = settings.Settings.MicEnabled;
-        _selectedResolution = settings.Settings.Resolution;
+        Resolutions.Add("Default");
+        _selectedResolution = string.IsNullOrEmpty(settings.Settings.Resolution) ? "Default" : settings.Settings.Resolution;
         _selectedQuality = MapQualityLabel(settings.Settings.RecordQuality);
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
         _timerSeconds = settings.Settings.TimerSeconds;
@@ -515,6 +516,16 @@ public partial class MainWindowViewModel : ViewModelBase
             null,
             TimeSpan.FromMilliseconds(150),
             TimeSpan.FromMilliseconds(-1));
+    }
+
+    [RelayCommand]
+    private void ResetCameraControls()
+    {
+        Brightness = 128;
+        Contrast = 128;
+        Saturation = 128;
+        _capture.ApplyCameraControls();
+        StatusMessage = "Camera controls reset.";
     }
 
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
@@ -1028,21 +1039,34 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanPlaySelected))]
     private void PlaySelected()
     {
-        if (SelectedGalleryItem is null)
-            return;
-
-        // Launch the system default video player.
-        try
-        {
-            Process.Start(new ProcessStartInfo("xdg-open", SelectedGalleryItem.Path) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Could not open the video: {ex.Message}";
-        }
+        if (SelectedGalleryItem is not null)
+            OpenWithDefaultApp(SelectedGalleryItem.Path);
     }
 
     private bool CanPlaySelected() => SelectedGalleryItem is { IsVideo: true };
+
+    /// <summary>Opens the selected gallery item (photo or video) with the default app.</summary>
+    [RelayCommand]
+    private void OpenSelected()
+    {
+        if (SelectedGalleryItem is not null)
+            OpenWithDefaultApp(SelectedGalleryItem.Path);
+    }
+
+    /// <summary>Opens a file or folder with the system default application (xdg-open).</summary>
+    private void OpenWithDefaultApp(string path)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo { FileName = "xdg-open", UseShellExecute = false };
+            psi.ArgumentList.Add(path);
+            Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not open: {ex.Message}";
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private Task DeleteSelectedAsync()
@@ -1178,9 +1202,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var directory = _settings.Settings.PhotoDirectory;
         if (Directory.Exists(directory))
-        {
-            Process.Start(new ProcessStartInfo("xdg-open", directory) { UseShellExecute = true });
-        }
+            OpenWithDefaultApp(directory);
     }
 
     [RelayCommand]

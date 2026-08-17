@@ -11,7 +11,9 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="camonlinux"
         Width="960" Height="600"
-        MinWidth="640" MinHeight="480">
+        MinWidth="640" MinHeight="480"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen">
 
     <DockPanel Background="Black">
 
@@ -57,19 +59,19 @@
                     <ComboBox ItemsSource="{Binding Devices}"
                               SelectedItem="{Binding SelectedDevice}"
                               PlaceholderText="Select a camera"
-                              Width="280"
+                              Width="240"
                               DisplayMemberBinding="{Binding Name}"/>
                     <ComboBox ItemsSource="{Binding Resolutions}"
                               SelectedItem="{Binding SelectedResolution}"
-                              Width="140"
+                              Width="130"
                               ToolTip.Tip="Capture resolution (per camera)"/>
                     <ComboBox ItemsSource="{Binding RotationOptions}"
                               SelectedItem="{Binding SelectedRotation}"
-                              Width="70"
+                              Width="64"
                               ToolTip.Tip="Rotate the image"/>
                     <ComboBox ItemsSource="{Binding ZoomOptions}"
                               SelectedItem="{Binding SelectedZoom}"
-                              Width="70"
+                              Width="64"
                               ToolTip.Tip="Digital zoom"/>
                 </StackPanel>
             </DockPanel>
@@ -90,6 +92,8 @@
                     <TextBlock Text="Saturation" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                     <Slider Value="{Binding Saturation}" Minimum="0" Maximum="255" Width="140"/>
                 </StackPanel>
+                <Button Content="Reset" Command="{Binding ResetCameraControlsCommand}" VerticalAlignment="Center"
+                        ToolTip.Tip="Reset brightness / contrast / saturation to defaults"/>
             </StackPanel>
         </Border>
 
@@ -168,6 +172,7 @@
                 <!-- Recent captures -->
                 <ListBox ItemsSource="{Binding GalleryItems}"
                          SelectedItem="{Binding SelectedGalleryItem}"
+                         DoubleTapped="OnGalleryDoubleTapped"
                          IsVisible="{Binding !ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">
                     <ListBox.ItemTemplate>
@@ -205,14 +210,22 @@
                         <TextBlock Text="Mic"/>
                     </StackPanel>
                 </ToggleButton>
-                <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}"
-                          Width="88" ToolTip.Tip="Recording quality"/>
-                <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}"
-                          Width="100" ToolTip.Tip="Auto-split recordings at this size"/>
-                <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}"
-                          Width="76" ToolTip.Tip="Countdown before a photo"/>
-                <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}"
-                          Width="70" ToolTip.Tip="Photo file format"/>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Quality" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}" Width="86"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Max size" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}" Width="96"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Timer" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}" Width="74"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Format" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}" Width="68"/>
+                </StackPanel>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
