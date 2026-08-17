@@ -6,5 +6,6 @@ public sealed class AppSettings
     public string PhotoDirectory { get; set; } = "";
     public string VideoDirectory { get; set; } = "";
     public bool Mirrored { get; set; } = true;
+    public bool MicEnabled { get; set; } = true;
     public string? LastDeviceId { get; set; }
 }

@@ -47,6 +47,10 @@ public sealed class GStreamerCaptureService : ICaptureService
     private AppSink? _appSink;
     private Element? _recordQueue;
     private Element? _recordFileSink;
+    private Element? _audioQueue;
+    private Element? _micVolume;
+    private string? _audioSource;
+    private bool _micMuted;
     private CameraDevice? _currentDevice;
     private CameraFrame? _latestFrame;
     private Gst.Bus? _bus;
@@ -62,6 +66,26 @@ public sealed class GStreamerCaptureService : ICaptureService
     public bool IsRecording => _recordQueue is not null;
     public bool Mirrored { get; set; } = true;
     public string Effect { get; set; } = "";
+
+    /// <summary>
+    /// Mutes the microphone. Applies live while recording (via the volume
+    /// element) and is baked into the pipeline when a recording starts.
+    /// </summary>
+    public bool MicMuted
+    {
+        get => _micMuted;
+        set
+        {
+            if (_micMuted == value)
+                return;
+            _micMuted = value;
+            if (_micVolume is not null)
+            {
+                try { _micVolume.SetProperty("mute", new GObject.Value(_micMuted)); }
+                catch { /* recording may be tearing down */ }
+            }
+        }
+    }
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -87,6 +111,9 @@ public sealed class GStreamerCaptureService : ICaptureService
                 GstApp.Module.Initialize();
                 GstVideo.Module.Initialize();
                 GstAudio.Module.Initialize();
+
+                // Record audio through the default input (PipeWire/Pulse/ALSA).
+                _audioSource = IsElementAvailable("autoaudiosrc") ? "autoaudiosrc" : null;
                 s_gstInitialized = true;
             }
             catch (Exception ex)
@@ -204,6 +231,8 @@ public sealed class GStreamerCaptureService : ICaptureService
         _appSink = null;
         _recordQueue = null;
         _recordFileSink = null;
+        _audioQueue = null;
+        _micVolume = null;
 
         DisposeBus();
 
@@ -236,15 +265,21 @@ public sealed class GStreamerCaptureService : ICaptureService
             "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
     }
 
-    private string RecordingDescription(string effect, string path)
+    private string RecordingDescription(string effect, string path, bool includeAudio)
     {
         var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
         var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
+        // Audio branch: default mic -> optional live mute -> AAC, muxed into the MKV.
+        var audio = includeAudio && _audioSource is not null
+            ? $" {_audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
+              "! audioresample ! audio/x-raw,rate=48000,channels=2 ! fdkaacenc bitrate=128000 " +
+              "! queue name=audq ! mux. "
+            : "";
         return
             $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} ! tee name=t " +
             "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
             "t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency " +
-            $"! matroskamux ! filesink name=filesink location=\"{path}\"";
+            $"! matroskamux name=mux ! filesink name=filesink location=\"{path}\"{audio}";
     }
 
     private bool TryBuildPipeline(string description)
@@ -260,6 +295,8 @@ public sealed class GStreamerCaptureService : ICaptureService
                 ?? throw new InvalidOperationException("Failed to create the preview appsink.");
             _recordQueue = bin.GetByName("recq");
             _recordFileSink = bin.GetByName("filesink");
+            _audioQueue = bin.GetByName("audq");
+            _micVolume = bin.GetByName("micvolume");
 
             _bus = _previewPipeline.GetBus();
             StartBusWatch();
@@ -391,9 +428,17 @@ public sealed class GStreamerCaptureService : ICaptureService
         // Rebuild the pipeline to add the recording branch — the preview stays live.
         StopPreviewInternal();
 
-        if (TryBuildPipeline(RecordingDescription(Effect, path)))
+        var withAudio = _audioSource is not null;
+        if (!TryBuildPipeline(RecordingDescription(Effect, path, withAudio)) && withAudio)
         {
-            _previewPipeline?.SetState(Gst.State.Playing);
+            // Audio branch failed (no sound device reachable) — retry without sound.
+            ErrorOccurred?.Invoke(this, "No audio input available; recording without sound.");
+            TryBuildPipeline(RecordingDescription(Effect, path, false));
+        }
+
+        if (_previewPipeline is not null)
+        {
+            _previewPipeline.SetState(Gst.State.Playing);
         }
         else
         {
@@ -414,10 +459,10 @@ public sealed class GStreamerCaptureService : ICaptureService
 
         StopBusWatch();
 
-        // EOS down the record branch lets x264enc flush and matroskamux write the
-        // final container (the preview branch runs until teardown).
-        var sinkPad = recordQueue.GetStaticPad("sink");
-        sinkPad?.SendEvent(Gst.Event.NewEos());
+        // EOS down both record branches lets x264enc/fdkaacenc flush and
+        // matroskamux finalize the container (the preview branch runs until teardown).
+        recordQueue.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
+        _audioQueue?.GetStaticPad("sink")?.SendEvent(Gst.Event.NewEos());
 
         // Wait for the muxer to finalize the file.
         if (_bus is not null)

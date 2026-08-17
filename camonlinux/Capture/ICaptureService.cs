@@ -22,6 +22,9 @@ public interface ICaptureService : IAsyncDisposable
     bool IsRecording { get; }
     bool Mirrored { get; set; }
 
+    /// <summary>Mutes the microphone during recordings. Applies live while recording.</summary>
+    bool MicMuted { get; set; }
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 

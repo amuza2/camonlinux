@@ -58,6 +58,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _mirrored;
 
     [ObservableProperty]
+    private bool _micEnabled = true;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -80,6 +83,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings = settings;
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
+        _micEnabled = settings.Settings.MicEnabled;
 
         // Effects are loaded in InitializeAsync (after GStreamer is initialized) —
         // ElementFactory.Find returns nothing before gst_init, so frei0r effects
@@ -244,6 +248,13 @@ public partial class MainWindowViewModel : ViewModelBase
         // The flip element is baked into the pipeline, so restart the preview.
         if (IsPreviewActive && SelectedDevice is not null)
             _ = StartPreviewAsync(SelectedDevice);
+    }
+
+    partial void OnMicEnabledChanged(bool value)
+    {
+        _settings.Settings.MicEnabled = value;
+        _settings.Save();
+        _capture.MicMuted = !value;
     }
 
     partial void OnSelectedEffectChanged(EffectOption? value)

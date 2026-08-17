@@ -12,7 +12,8 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - Take photos (JPEG, saved to `~/Pictures`)
 - **Burst mode** — take a photo every 2.5 s
 - **Effects gallery** — 25 built-in GStreamer effects plus up to 17 **frei0r** filters (cartoon, posterize, pixelate, RGB split, glitch, …) applied to preview, photos and recordings. Effects are auto-detected at startup — the frei0r ones appear automatically once `frei0r-plugins` is installed. Each effect has a **live thumbnail preview** rendered from a camera frame
-- Record videos (H.264 + Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
+- Record videos (H.264 + AAC, Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
+- **Audio in recordings** — captures the default microphone (PipeWire/Pulse/ALSA via `autoaudiosrc`) as AAC, with a **Mic** toggle for live mute (applies even mid-recording)
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
@@ -106,6 +107,7 @@ v4l2src ! videoconvert ! videoflip (mirror) ! {effect} ! videoconvert ! video/x-
 v4l2src ! videoconvert ! videoflip ! {effect} ! tee
     ├─ queue ! videoconvert ! video/x-raw,format=BGRx ! appsink      → live preview
     └─ queue ! x264enc ! matroskamux ! filesink                       → MKV recording
+       autoaudiosrc ! volume(mute) ! fdkaacenc ! mux.                  → mic audio (AAC)
 ```
 
 - Frames are pulled from the `appsink` on a background thread (`TryPullSample`)
@@ -119,7 +121,7 @@ v4l2src ! videoconvert ! videoflip ! {effect} ! tee
 
 - [x] Device hot-plug detection (poll `/dev/video*` every 2 s)
 - [x] frei0r effects (install `frei0r-plugins` + `gst-plugins-bad`) — auto-detected
-- [ ] Audio in recordings (PipeWire/pulse audio capture)
+- [x] Audio in recordings (default mic → AAC; `Mic` toggle mutes live)
 - [ ] AppStream metainfo + AUR PKGBUILD
 - [ ] i18n
 

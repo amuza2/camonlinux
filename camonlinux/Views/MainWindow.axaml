@@ -119,6 +119,13 @@
                            VerticalAlignment="Center"/>
                 <Button Content="Take Photo" Command="{Binding TakePhotoCommand}"
                         FontSize="15" Padding="20,8"/>
+                <ToggleButton IsChecked="{Binding MicEnabled}"
+                              ToolTip.Tip="Record audio from the microphone">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#x1F3A4;"/>
+                        <TextBlock Text="Mic"/>
+                    </StackPanel>
+                </ToggleButton>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
