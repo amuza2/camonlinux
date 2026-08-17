@@ -13,5 +13,6 @@ public sealed class AppSettings
     public int TimerSeconds { get; set; }
     public string Rotation { get; set; } = "auto";
     public double Zoom { get; set; } = 1.0;
+    public string PhotoFormat { get; set; } = "jpeg";
     public string? LastDeviceId { get; set; }
 }

@@ -40,6 +40,9 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Digital zoom factor (1.0 = none).</summary>
     double Zoom { get; set; }
 
+    /// <summary>Photo file format: "jpeg" or "png".</summary>
+    string PhotoFormat { get; set; }
+
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }
 

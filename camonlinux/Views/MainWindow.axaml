@@ -145,6 +145,8 @@
                           Width="100" ToolTip.Tip="Auto-split recordings at this size"/>
                 <ComboBox ItemsSource="{Binding TimerOptions}" SelectedItem="{Binding SelectedTimer}"
                           Width="76" ToolTip.Tip="Countdown before a photo"/>
+                <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}"
+                          Width="70" ToolTip.Tip="Photo file format"/>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"

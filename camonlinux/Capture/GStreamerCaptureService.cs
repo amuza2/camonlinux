@@ -124,6 +124,9 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>Digital zoom factor (1.0 = none).</summary>
     public double Zoom { get; set; } = 1.0;
+
+    /// <summary>Photo file format: "jpeg" or "png".</summary>
+    public string PhotoFormat { get; set; } = "jpeg";
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -493,7 +496,8 @@ public sealed class GStreamerCaptureService : ICaptureService
         using var bitmap = new SKBitmap(info);
         Marshal.Copy(frame.Data, 0, bitmap.GetPixels(), frame.Data.Length);
         using var image = SKImage.FromBitmap(bitmap);
-        using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 92);
+        var format = PhotoFormat == "png" ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg;
+        using var encoded = image.Encode(format, 92);
         using var stream = File.Create(path);
         encoded.SaveTo(stream);
 

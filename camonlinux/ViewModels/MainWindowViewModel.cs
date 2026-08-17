@@ -27,6 +27,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private Timer? _photoCountdownTimer;
     private int _timerSeconds;
     private int _countdownRemaining;
+    private string _photoFormat = "jpeg";
     private string? _sampleImagePath;
     private bool _generatingThumbnails;
     private Timer? _devicesTimer;
@@ -42,6 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> TimerOptions { get; } = new() { "Off", "3 s", "10 s" };
     public ObservableCollection<string> RotationOptions { get; } = new() { "0°", "90°", "180°", "270°" };
     public ObservableCollection<string> ZoomOptions { get; } = new() { "1×", "1.5×", "2×", "3×", "4×" };
+    public ObservableCollection<string> PhotoFormatOptions { get; } = new() { "JPEG", "PNG" };
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -94,6 +96,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _selectedZoom = "1×";
 
     [ObservableProperty]
+    private string _selectedPhotoFormat = "JPEG";
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     private EffectOption? _selectedEffect;
@@ -124,8 +129,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedTimer = MapTimerLabel(settings.Settings.TimerSeconds);
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
+        _photoFormat = settings.Settings.PhotoFormat;
+        _selectedPhotoFormat = _photoFormat == "png" ? "PNG" : "JPEG";
         _capture.Rotation = settings.Settings.Rotation;
         _capture.Zoom = settings.Settings.Zoom;
+        _capture.PhotoFormat = settings.Settings.PhotoFormat;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
@@ -399,6 +407,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static string MapZoomLabel(double zoom) => zoom switch { >= 4.0 => "4×", >= 3.0 => "3×", >= 2.0 => "2×", >= 1.5 => "1.5×", _ => "1×" };
 
+    partial void OnSelectedPhotoFormatChanged(string value)
+    {
+        _photoFormat = value == "PNG" ? "png" : "jpeg";
+        _settings.Settings.PhotoFormat = _photoFormat;
+        _settings.Save();
+        _capture.PhotoFormat = _photoFormat;
+    }
+
     private static string MapQualityLabel(string key) => key switch { "low" => "Low", "high" => "High", _ => "Medium" };
 
     private static string MapMaxSizeLabel(long mb) => mb switch { 500 => "500 MB", 1024 => "1 GB", 2048 => "2 GB", _ => "Unlimited" };
@@ -649,14 +665,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private bool CanTakePhoto() => IsPreviewActive && !IsRecording && !IsBurstActive;
 
-    private static string NextPhotoPath(string directory)
+    private string NextPhotoPath(string directory)
     {
         Directory.CreateDirectory(directory);
+        var ext = _photoFormat == "png" ? "png" : "jpg";
         var stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-        var path = Path.Combine(directory, $"picture_{stamp}.jpg");
+        var path = Path.Combine(directory, $"picture_{stamp}.{ext}");
         var index = 1;
         while (File.Exists(path))
-            path = Path.Combine(directory, $"picture_{stamp}_{index++}.jpg");
+            path = Path.Combine(directory, $"picture_{stamp}_{index++}.{ext}");
         return path;
     }
 
