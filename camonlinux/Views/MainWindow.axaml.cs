@@ -55,7 +55,11 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>Toolbar Mask toggle: enable masking and open the editor (or disable + close it).</summary>
+    /// <summary>
+    /// Toolbar Mask toggle: toggles masking and opens/closes the editor. Changes made
+    /// in the editor apply to the live preview immediately; closing the editor window
+    /// keeps the mask active (it only turns off via this toolbar toggle).
+    /// </summary>
     private void OnMaskToggled(object? sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
@@ -66,11 +70,7 @@ public partial class MainWindow : Window
             if (_maskEditorWindow is null)
             {
                 _maskEditorWindow = new MaskEditorWindow { DataContext = vm.MaskEditor };
-                _maskEditorWindow.Closed += (_, _) =>
-                {
-                    _maskEditorWindow = null;
-                    vm.IsMaskEnabled = false;
-                };
+                _maskEditorWindow.Closed += (_, _) => _maskEditorWindow = null;
             }
             _maskEditorWindow.Show(this);
         }
