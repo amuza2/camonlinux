@@ -24,6 +24,9 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
 - Recent captures gallery with **photo & video thumbnails**, **play videos** (system player), **copy / move / rename / delete**, plus a **settings window** (⚙) to pick the photo & video folders
+- **Audio device picker** — choose which mic to record (lists PipeWire/Pulse sources via `pactl`, monitors excluded)
+- **Keyboard shortcuts** — `Space` photo, `R` record, `B` burst, `M` mirror, `E` effects, `F11` fullscreen
+- **Mouse-wheel zoom** over the preview, **live recording file size** beside the timer, **effect search box**, **toast notifications**, **delete confirmation**, **auto-refreshing gallery**, and the window **remembers its size/state**
 - **Single-instance guard** — a second launch notifies and exits instead of fighting over the camera
 - Desktop notifications (`notify-send`)
 - Settings persisted to `~/.config/camonlinux/settings.json`
