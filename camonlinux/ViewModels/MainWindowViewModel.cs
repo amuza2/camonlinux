@@ -388,6 +388,46 @@ public partial class MainWindowViewModel : ViewModelBase
         GalleryItems.Clear();
         foreach (var item in items)
             GalleryItems.Add(item);
+
+        _ = GenerateGalleryThumbnailsAsync();
+    }
+
+    /// <summary>Generates thumbnails for gallery items (photos and videos), cached on disk.</summary>
+    private async Task GenerateGalleryThumbnailsAsync()
+    {
+        foreach (var item in GalleryItems.ToList())
+            await EnsureMediaThumbnailAsync(item);
+    }
+
+    private async Task EnsureMediaThumbnailAsync(MediaItem item)
+    {
+        if (item.Thumbnail is not null)
+            return;
+
+        var thumbPath = ThumbCachePath(item.Path);
+        var needsRender = !File.Exists(thumbPath) || File.GetLastWriteTime(thumbPath) < item.ModifiedAt;
+
+        if (needsRender)
+        {
+            // Reuse the one-shot GStreamer thumbnail pipeline for photos AND videos.
+            var rendered = await Task.Run(() =>
+                _capture.RenderEffectThumbnailAsync("", item.Path, thumbPath, 100, 56) is not null);
+            if (!rendered)
+                return;
+        }
+
+        var path = thumbPath;
+        Dispatcher.UIThread.Post(() =>
+        {
+            try { item.Thumbnail = new Bitmap(path); } catch { /* ignore */ }
+        });
+    }
+
+    private static string ThumbCachePath(string filePath)
+    {
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)));
+        return Path.Combine(Path.GetTempPath(), "camonlinux_gallery", hash + ".png");
     }
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]

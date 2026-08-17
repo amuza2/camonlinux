@@ -93,9 +93,18 @@
                          Background="Transparent" Margin="4,0,4,8">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:MediaItem">
-                            <TextBlock Text="{Binding Name}"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" Margin="6,2"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,3">
+                                <Border CornerRadius="3" ClipToBounds="True" Background="#40000000">
+                                    <Image Source="{Binding Thumbnail}" Width="64" Height="36"
+                                           Stretch="UniformToFill"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Spacing="1">
+                                    <TextBlock Text="{Binding Name}" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="140"/>
+                                    <TextBlock Text="{Binding ModifiedAt, StringFormat='{}{0:MMM d, HH:mm}'}"
+                                               FontSize="10" Foreground="#A0A0A0"/>
+                                </StackPanel>
+                            </StackPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
