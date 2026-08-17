@@ -71,6 +71,7 @@ public sealed class GStreamerCaptureService : ICaptureService
     private string _recordQuality = "medium";
     private long _maxFileSizeMB;
     private readonly Dictionary<string, IReadOnlyList<string>> _modeCache = new();
+    private readonly Dictionary<string, HashSet<string>> _supportedControls = new();
     private readonly Stopwatch _recSizeStopwatch = new();
     private readonly SemaphoreSlim _recordingGate = new(1, 1);
     private string? _recordPath;
@@ -142,6 +143,33 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
     public int Saturation { get; set; } = 128;
+
+    /// <summary>v4l2 sharpness control (0-255, 128 = default).</summary>
+    public int Sharpness { get; set; } = 128;
+
+    /// <summary>v4l2 gain control (0-255, 0 = default).</summary>
+    public int Gain { get; set; }
+
+    /// <summary>v4l2 backlight compensation (0-1).</summary>
+    public int BacklightCompensation { get; set; }
+
+    /// <summary>Automatic white balance (true) or manual temperature (false).</summary>
+    public bool WhiteBalanceAuto { get; set; } = true;
+
+    /// <summary>Manual white balance temperature in Kelvin (2000-7500).</summary>
+    public int WhiteBalanceTemperature { get; set; } = 4000;
+
+    /// <summary>Automatic exposure (true) or manual exposure time (false).</summary>
+    public bool ExposureAuto { get; set; } = true;
+
+    /// <summary>Manual exposure time (3-2047).</summary>
+    public int ExposureValue { get; set; } = 250;
+
+    /// <summary>Continuous auto-focus (true) or manual focus distance (false).</summary>
+    public bool FocusAuto { get; set; } = true;
+
+    /// <summary>Manual focus position (0-255).</summary>
+    public int FocusValue { get; set; }
 
     /// <summary>PulseAudio source name to record from ("" = default).</summary>
     public string AudioDevice { get; set; } = "";
@@ -368,17 +396,99 @@ public sealed class GStreamerCaptureService : ICaptureService
     }
 
     /// <summary>
-    /// Applies the brightness/contrast/saturation controls to the current camera
-    /// via v4l2-ctl (applied to the hardware directly, so it works live without
-    /// rebuilding the pipeline). Best-effort; silently ignored when v4l2-ctl is
+    /// Applies all camera controls (brightness/contrast/saturation/sharpness/gain/
+    /// white balance/exposure/focus) to the current camera via v4l2-ctl. Controls the
+    /// device doesn't expose are skipped, and dependent values (white-balance
+    /// temperature, exposure time, focus) are only written in manual mode and after
+    /// the matching auto toggle. Best-effort; silently ignored when v4l2-ctl is
     /// missing or a control isn't supported.
     /// </summary>
     public void ApplyCameraControls()
     {
-        var device = _currentDevice?.Path;
+        var device = _currentDevice;
         if (device is null)
             return;
-        RunV4l2Ctl(device, $"brightness={Brightness},contrast={Contrast},saturation={Saturation}");
+        var supported = GetSupportedControls(device);
+
+        void Add(List<string> sets, string name, int value)
+        {
+            if (supported.Contains(name))
+                sets.Add($"{name}={value}");
+        }
+
+        // Independent controls — safe to set together.
+        var independent = new List<string>();
+        Add(independent, "brightness", Brightness);
+        Add(independent, "contrast", Contrast);
+        Add(independent, "saturation", Saturation);
+        Add(independent, "sharpness", Sharpness);
+        Add(independent, "gain", Gain);
+        Add(independent, "backlight_compensation", BacklightCompensation);
+        if (independent.Count > 0)
+            RunV4l2Ctl(device.Path, string.Join(",", independent));
+
+        // White balance: disable auto first so the temperature control becomes active.
+        var wb = new List<string>();
+        Add(wb, "white_balance_automatic", WhiteBalanceAuto ? 1 : 0);
+        if (!WhiteBalanceAuto)
+            Add(wb, "white_balance_temperature", WhiteBalanceTemperature);
+        if (wb.Count > 0)
+            RunV4l2Ctl(device.Path, string.Join(",", wb));
+
+        // Exposure: manual (1) or aperture-priority (3), then the exposure value.
+        var exp = new List<string>();
+        Add(exp, "auto_exposure", ExposureAuto ? 3 : 1);
+        if (!ExposureAuto)
+            Add(exp, "exposure_time_absolute", ExposureValue);
+        if (exp.Count > 0)
+            RunV4l2Ctl(device.Path, string.Join(",", exp));
+
+        // Focus: continuous auto, or a manual position.
+        var focus = new List<string>();
+        Add(focus, "focus_automatic_continuous", FocusAuto ? 1 : 0);
+        if (!FocusAuto)
+            Add(focus, "focus_absolute", FocusValue);
+        if (focus.Count > 0)
+            RunV4l2Ctl(device.Path, string.Join(",", focus));
+    }
+
+    /// <summary>
+    /// Names of the v4l2 controls the device exposes, parsed from <c>--list-ctrls</c>
+    /// and cached per device. Used to show only the controls a camera actually has.
+    /// </summary>
+    public IReadOnlySet<string> GetSupportedControls(CameraDevice device)
+    {
+        if (_supportedControls.TryGetValue(device.Id, out var cached))
+            return cached;
+
+        var names = new HashSet<string>();
+        try
+        {
+            var psi = new ProcessStartInfo("v4l2-ctl", $"-d {device.Path} --list-ctrls")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            using var process = Process.Start(psi);
+            var output = process is null ? "" : process.StandardOutput.ReadToEnd();
+            process?.WaitForExit(2000);
+            foreach (var line in output.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith("User Controls") || trimmed.StartsWith("Camera Controls"))
+                    continue;
+                var name = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(name))
+                    names.Add(name);
+            }
+        }
+        catch
+        {
+            // Best-effort.
+        }
+        _supportedControls[device.Id] = names;
+        return names;
     }
 
     private static void RunV4l2Ctl(string device, string args)

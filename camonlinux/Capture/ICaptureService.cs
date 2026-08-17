@@ -55,6 +55,33 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>v4l2 saturation control (0-255, 128 = default).</summary>
     int Saturation { get; set; }
 
+    /// <summary>v4l2 sharpness control (0-255, 128 = default).</summary>
+    int Sharpness { get; set; }
+
+    /// <summary>v4l2 gain control (0-255, 0 = default).</summary>
+    int Gain { get; set; }
+
+    /// <summary>v4l2 backlight compensation (0-1).</summary>
+    int BacklightCompensation { get; set; }
+
+    /// <summary>Automatic white balance (true) or manual temperature (false).</summary>
+    bool WhiteBalanceAuto { get; set; }
+
+    /// <summary>Manual white balance temperature in Kelvin (2000-7500).</summary>
+    int WhiteBalanceTemperature { get; set; }
+
+    /// <summary>Automatic exposure (true) or manual exposure time (false).</summary>
+    bool ExposureAuto { get; set; }
+
+    /// <summary>Manual exposure time (3-2047).</summary>
+    int ExposureValue { get; set; }
+
+    /// <summary>Continuous auto-focus (true) or manual focus distance (false).</summary>
+    bool FocusAuto { get; set; }
+
+    /// <summary>Manual focus position (0-255).</summary>
+    int FocusValue { get; set; }
+
     /// <summary>PulseAudio source name to record from ("" = default).</summary>
     string AudioDevice { get; set; }
 
@@ -63,6 +90,12 @@ public interface ICaptureService : IAsyncDisposable
 
     /// <summary>Applies the current camera controls live via v4l2-ctl.</summary>
     void ApplyCameraControls();
+
+    /// <summary>
+    /// Names of the v4l2 controls the given device exposes (e.g. "sharpness",
+    /// "white_balance_automatic"). Used to show only the controls a camera has.
+    /// </summary>
+    IReadOnlySet<string> GetSupportedControls(CameraDevice device);
 
     /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
     string Effect { get; set; }

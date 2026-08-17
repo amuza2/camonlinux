@@ -86,23 +86,65 @@
             </DockPanel>
         </Border>
 
-        <!-- Camera controls (brightness / contrast / saturation) -->
+        <!-- Camera controls (brightness / contrast / saturation / advanced) -->
         <Border DockPanel.Dock="Top" Padding="12,6" Background="#181818">
-            <StackPanel Orientation="Horizontal" Spacing="24">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Bright" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
-                    <Slider Value="{Binding Brightness}" Minimum="0" Maximum="255" Width="140"/>
+            <StackPanel Orientation="Vertical" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Bright" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding Brightness}" Minimum="0" Maximum="255" Width="140"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Contrast" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding Contrast}" Minimum="0" Maximum="255" Width="140"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Saturation" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding Saturation}" Minimum="0" Maximum="255" Width="140"/>
+                    </StackPanel>
+                    <ToggleButton IsChecked="{Binding ShowAdvancedControls}" Content="More"
+                                  ToolTip.Tip="Show additional camera controls (white balance, exposure, focus, …)"
+                                  VerticalAlignment="Center"/>
+                    <Button Content="Reset" Command="{Binding ResetCameraControlsCommand}" VerticalAlignment="Center"
+                            ToolTip.Tip="Reset camera controls to defaults"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Contrast" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
-                    <Slider Value="{Binding Contrast}" Minimum="0" Maximum="255" Width="140"/>
+
+                <!-- Advanced controls, shown only for devices that expose them -->
+                <StackPanel Orientation="Horizontal" Spacing="24" IsVisible="{Binding ShowAdvancedControls}">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSharpness}">
+                        <TextBlock Text="Sharp" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding Sharpness}" Minimum="0" Maximum="255" Width="110"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWhiteBalance}">
+                        <TextBlock Text="WBalance" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <ToggleButton IsChecked="{Binding WhiteBalanceAuto}" Content="Auto" Padding="10,2"/>
+                        <Slider Value="{Binding WhiteBalanceTemperature}" Minimum="2000" Maximum="7500" Width="130"
+                                IsEnabled="{Binding !WhiteBalanceAuto}"
+                                ToolTip.Tip="White balance temperature (K)"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowExposure}">
+                        <TextBlock Text="Exposure" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <ToggleButton IsChecked="{Binding ExposureAuto}" Content="Auto" Padding="10,2"/>
+                        <Slider Value="{Binding ExposureValue}" Minimum="3" Maximum="2047" Width="130"
+                                IsEnabled="{Binding !ExposureAuto}"
+                                ToolTip.Tip="Exposure time"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowFocus}">
+                        <TextBlock Text="Focus" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <ToggleButton IsChecked="{Binding FocusAuto}" Content="Auto" Padding="10,2"/>
+                        <Slider Value="{Binding FocusValue}" Minimum="0" Maximum="255" Width="130"
+                                IsEnabled="{Binding !FocusAuto}"
+                                ToolTip.Tip="Manual focus distance"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowGain}">
+                        <TextBlock Text="Gain" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding Gain}" Minimum="0" Maximum="255" Width="110"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowBacklight}">
+                        <TextBlock Text="Backlight" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
+                        <Slider Value="{Binding BacklightCompensation}" Minimum="0" Maximum="1" Width="110"/>
+                    </StackPanel>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Saturation" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
-                    <Slider Value="{Binding Saturation}" Minimum="0" Maximum="255" Width="140"/>
-                </StackPanel>
-                <Button Content="Reset" Command="{Binding ResetCameraControlsCommand}" VerticalAlignment="Center"
-                        ToolTip.Tip="Reset brightness / contrast / saturation to defaults"/>
             </StackPanel>
         </Border>
 

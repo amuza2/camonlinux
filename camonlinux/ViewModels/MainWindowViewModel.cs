@@ -128,6 +128,43 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _saturation = 128;
 
     [ObservableProperty]
+    private int _sharpness = 128;
+
+    [ObservableProperty]
+    private int _gain;
+
+    [ObservableProperty]
+    private int _backlightCompensation;
+
+    [ObservableProperty]
+    private bool _whiteBalanceAuto = true;
+
+    [ObservableProperty]
+    private int _whiteBalanceTemperature = 4000;
+
+    [ObservableProperty]
+    private bool _exposureAuto = true;
+
+    [ObservableProperty]
+    private int _exposureValue = 250;
+
+    [ObservableProperty]
+    private bool _focusAuto = true;
+
+    [ObservableProperty]
+    private int _focusValue;
+
+    [ObservableProperty]
+    private bool _showAdvancedControls;
+
+    [ObservableProperty] private bool _showSharpness;
+    [ObservableProperty] private bool _showWhiteBalance;
+    [ObservableProperty] private bool _showExposure;
+    [ObservableProperty] private bool _showFocus;
+    [ObservableProperty] private bool _showGain;
+    [ObservableProperty] private bool _showBacklight;
+
+    [ObservableProperty]
     private bool _showIntensitySlider;
 
     [ObservableProperty]
@@ -202,6 +239,15 @@ public partial class MainWindowViewModel : ViewModelBase
         _brightness = settings.Settings.Brightness;
         _contrast = settings.Settings.Contrast;
         _saturation = settings.Settings.Saturation;
+        _sharpness = settings.Settings.Sharpness;
+        _gain = settings.Settings.Gain;
+        _backlightCompensation = settings.Settings.BacklightCompensation;
+        _whiteBalanceAuto = settings.Settings.WhiteBalanceAuto;
+        _whiteBalanceTemperature = settings.Settings.WhiteBalanceTemperature;
+        _exposureAuto = settings.Settings.ExposureAuto;
+        _exposureValue = settings.Settings.ExposureValue;
+        _focusAuto = settings.Settings.FocusAuto;
+        _focusValue = settings.Settings.FocusValue;
         _capture.Rotation = settings.Settings.Rotation;
         _capture.Zoom = settings.Settings.Zoom;
         _capture.PhotoFormat = settings.Settings.PhotoFormat;
@@ -209,6 +255,15 @@ public partial class MainWindowViewModel : ViewModelBase
         _capture.Brightness = settings.Settings.Brightness;
         _capture.Contrast = settings.Settings.Contrast;
         _capture.Saturation = settings.Settings.Saturation;
+        _capture.Sharpness = settings.Settings.Sharpness;
+        _capture.Gain = settings.Settings.Gain;
+        _capture.BacklightCompensation = settings.Settings.BacklightCompensation;
+        _capture.WhiteBalanceAuto = settings.Settings.WhiteBalanceAuto;
+        _capture.WhiteBalanceTemperature = settings.Settings.WhiteBalanceTemperature;
+        _capture.ExposureAuto = settings.Settings.ExposureAuto;
+        _capture.ExposureValue = settings.Settings.ExposureValue;
+        _capture.FocusAuto = settings.Settings.FocusAuto;
+        _capture.FocusValue = settings.Settings.FocusValue;
         _capture.AudioDevice = settings.Settings.AudioDevice;
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
@@ -425,7 +480,20 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task OnDeviceSelectedAsync(CameraDevice device)
     {
         await LoadResolutionsAsync(device);
+        UpdateSupportedControlVisibility(device);
         await StartPreviewAsync(device);
+    }
+
+    /// <summary>Shows only the advanced camera controls the current device exposes.</summary>
+    private void UpdateSupportedControlVisibility(CameraDevice device)
+    {
+        var supported = _capture.GetSupportedControls(device);
+        ShowSharpness = supported.Contains("sharpness");
+        ShowWhiteBalance = supported.Contains("white_balance_automatic");
+        ShowExposure = supported.Contains("auto_exposure");
+        ShowFocus = supported.Contains("focus_automatic_continuous");
+        ShowGain = supported.Contains("gain");
+        ShowBacklight = supported.Contains("backlight_compensation");
     }
 
     private async Task LoadResolutionsAsync(CameraDevice device)
@@ -571,6 +639,24 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSaturationChanged(int value) => CameraControlsChanged();
 
+    partial void OnSharpnessChanged(int value) => CameraControlsChanged();
+
+    partial void OnGainChanged(int value) => CameraControlsChanged();
+
+    partial void OnBacklightCompensationChanged(int value) => CameraControlsChanged();
+
+    partial void OnWhiteBalanceAutoChanged(bool value) => CameraControlsChanged();
+
+    partial void OnWhiteBalanceTemperatureChanged(int value) => CameraControlsChanged();
+
+    partial void OnExposureAutoChanged(bool value) => CameraControlsChanged();
+
+    partial void OnExposureValueChanged(int value) => CameraControlsChanged();
+
+    partial void OnFocusAutoChanged(bool value) => CameraControlsChanged();
+
+    partial void OnFocusValueChanged(int value) => CameraControlsChanged();
+
     /// <summary>
     /// Persists the camera controls and applies them live (debounced so dragging a
     /// slider doesn't spawn a v4l2-ctl per tick).
@@ -580,11 +666,29 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.Brightness = Brightness;
         _settings.Settings.Contrast = Contrast;
         _settings.Settings.Saturation = Saturation;
+        _settings.Settings.Sharpness = Sharpness;
+        _settings.Settings.Gain = Gain;
+        _settings.Settings.BacklightCompensation = BacklightCompensation;
+        _settings.Settings.WhiteBalanceAuto = WhiteBalanceAuto;
+        _settings.Settings.WhiteBalanceTemperature = WhiteBalanceTemperature;
+        _settings.Settings.ExposureAuto = ExposureAuto;
+        _settings.Settings.ExposureValue = ExposureValue;
+        _settings.Settings.FocusAuto = FocusAuto;
+        _settings.Settings.FocusValue = FocusValue;
         _settings.Save();
 
         _capture.Brightness = Brightness;
         _capture.Contrast = Contrast;
         _capture.Saturation = Saturation;
+        _capture.Sharpness = Sharpness;
+        _capture.Gain = Gain;
+        _capture.BacklightCompensation = BacklightCompensation;
+        _capture.WhiteBalanceAuto = WhiteBalanceAuto;
+        _capture.WhiteBalanceTemperature = WhiteBalanceTemperature;
+        _capture.ExposureAuto = ExposureAuto;
+        _capture.ExposureValue = ExposureValue;
+        _capture.FocusAuto = FocusAuto;
+        _capture.FocusValue = FocusValue;
 
         _cameraControlsDebounce?.Dispose();
         _cameraControlsDebounce = new Timer(
@@ -600,6 +704,15 @@ public partial class MainWindowViewModel : ViewModelBase
         Brightness = 128;
         Contrast = 128;
         Saturation = 128;
+        Sharpness = 128;
+        Gain = 0;
+        BacklightCompensation = 0;
+        WhiteBalanceAuto = true;
+        WhiteBalanceTemperature = 4000;
+        ExposureAuto = true;
+        ExposureValue = 250;
+        FocusAuto = true;
+        FocusValue = 0;
         _capture.ApplyCameraControls();
         StatusMessage = "Camera controls reset.";
     }
