@@ -37,7 +37,10 @@ public sealed class VirtualCameraService : IDisposable
 
     /// <summary>
     /// Finds the first /dev/videoN node backed by the v4l2loopback driver, or null
-    /// if the module isn't loaded / no loopback device exists.
+    /// if the module isn't loaded / no loopback device exists. v4l2loopback devices
+    /// are virtual and usually have NO <c>device/driver</c> symlink, so they're also
+    /// matched by card name (the label we request, or the driver's default
+    /// "Dummy video device").
     /// </summary>
     public static string? FindLoopbackDevice()
     {
@@ -50,12 +53,26 @@ public sealed class VirtualCameraService : IDisposable
             foreach (var node in Directory.GetDirectories(dir))
             {
                 var name = Path.GetFileName(node); // e.g. "video10"
+
+                // 1) Some loopback variants expose a device/driver symlink.
                 var driverLink = Path.Combine(node, "device", "driver");
-                if (!File.Exists(driverLink))
-                    continue;
-                var target = new FileInfo(driverLink).LinkTarget ?? string.Empty;
-                if (target.IndexOf("v4l2loopback", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return "/dev/" + name;
+                if (File.Exists(driverLink))
+                {
+                    var target = new FileInfo(driverLink).LinkTarget ?? string.Empty;
+                    if (target.IndexOf("v4l2loopback", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "/dev/" + name;
+                }
+
+                // 2) v4l2loopback has no device/ node — match its card name file.
+                var nameFile = Path.Combine(node, "name");
+                if (File.Exists(nameFile))
+                {
+                    var cardName = File.ReadAllText(nameFile);
+                    if (cardName.IndexOf("camonlinux", StringComparison.OrdinalIgnoreCase) >= 0
+                        || cardName.IndexOf("v4l2loopback", StringComparison.OrdinalIgnoreCase) >= 0
+                        || cardName.IndexOf("dummy video device", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "/dev/" + name;
+                }
             }
         }
         catch
