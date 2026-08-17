@@ -16,6 +16,9 @@ public partial class MainWindow : Window
     private SettingsService? _settings;
     private MaskPipeline? _maskPipeline;
     private MaskEditorWindow? _maskEditorWindow;
+    private VirtualCameraService? _virtualCamera;
+    private int _lastFrameW;
+    private int _lastFrameH;
     private readonly MaskFrame _maskFrame = new();
 
     public MainWindow()
@@ -24,13 +27,15 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Wires the capture service's frames to the preview surface. When a mask pipeline
-    /// is provided, it is applied in place (BGRA32) on the streaming thread before the
-    /// frame is pushed to the UI.
+    /// Wires the capture service's frames to the preview surface and, optionally, to
+    /// the virtual webcam. When a mask pipeline is provided, it is applied in place
+    /// (BGRA32) on the streaming thread before the frame is pushed, so the virtual
+    /// webcam shows the masked/adjusted feed too.
     /// </summary>
-    public void ConnectCapture(ICaptureService capture, MaskPipeline? maskPipeline)
+    public void ConnectCapture(ICaptureService capture, MaskPipeline? maskPipeline, VirtualCameraService? virtualCamera = null)
     {
         _maskPipeline = maskPipeline;
+        _virtualCamera = virtualCamera;
 
         // Composite the mask alpha in software while masking is enabled; fall back to
         // the fast copy path otherwise.
@@ -51,8 +56,62 @@ public partial class MainWindow : Window
                 _maskFrame.Set(frame.Data, frame.Width, frame.Height);
                 _maskPipeline.Apply(_maskFrame);
             }
+            _lastFrameW = frame.Width;
+            _lastFrameH = frame.Height;
             VideoSurfaceControl.PushFrame(frame);
+            _virtualCamera?.PushFrame(frame.Data, frame.Width, frame.Height);
         };
+    }
+
+    /// <summary>
+    /// Toolbar Webcam toggle: shares the live (masked/adjusted) preview as a virtual
+    /// webcam via v4l2loopback. If the module isn't loaded, tells the user how to.
+    /// </summary>
+    private void OnVirtualCamToggled(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
+            return;
+
+        var enable = tb.IsChecked == true;
+        vm.IsVirtualCamEnabled = enable;
+        if (_virtualCamera is null)
+        {
+            vm.StatusMessage = "Virtual webcam is not available.";
+            vm.IsVirtualCamEnabled = false;
+            tb.IsChecked = false;
+            return;
+        }
+
+        if (enable)
+        {
+            var device = VirtualCameraService.FindLoopbackDevice();
+            if (device is null)
+            {
+                vm.StatusMessage =
+                    "Virtual webcam unavailable — run: sudo modprobe v4l2loopback video_nr=10 card_label=\"camonlinux Virtual Camera\" exclusive_caps=1";
+                vm.IsVirtualCamEnabled = false;
+                tb.IsChecked = false;
+                return;
+            }
+
+            var w = _lastFrameW > 0 ? _lastFrameW : 1280;
+            var h = _lastFrameH > 0 ? _lastFrameH : 720;
+            if (_virtualCamera.Start(device, w, h, 30))
+            {
+                vm.StatusMessage = $"Virtual webcam live on {device}";
+            }
+            else
+            {
+                vm.StatusMessage = $"Failed to start virtual webcam: {_virtualCamera.LastError}";
+                vm.IsVirtualCamEnabled = false;
+                tb.IsChecked = false;
+            }
+        }
+        else
+        {
+            _virtualCamera.Stop();
+            vm.StatusMessage = "Virtual webcam stopped.";
+        }
     }
 
     /// <summary>

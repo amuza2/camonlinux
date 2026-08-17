@@ -51,6 +51,13 @@
                             <TextBlock Text="Mask"/>
                         </StackPanel>
                     </ToggleButton>
+                    <ToggleButton IsChecked="{Binding IsVirtualCamEnabled}" Click="OnVirtualCamToggled"
+                                  ToolTip.Tip="Share the preview as a virtual webcam (needs the v4l2loopback module)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="&#x1F3A5;"/>
+                            <TextBlock Text="Webcam"/>
+                        </StackPanel>
+                    </ToggleButton>
                     <Button Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Scan for cameras">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="&#x21BB;"/>

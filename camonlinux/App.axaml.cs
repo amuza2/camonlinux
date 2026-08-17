@@ -38,19 +38,21 @@ public partial class App : Application
             var settings = new SettingsService();
             var capture = new GStreamerCaptureService();
             var mediaLibrary = new MediaLibraryService();
+            var virtualCamera = new VirtualCameraService();
 
             var viewModel = new MainWindowViewModel(capture, settings, mediaLibrary);
             var window = new MainWindow
             {
                 DataContext = viewModel
             };
-            window.ConnectCapture(capture, viewModel.MaskPipeline);
+            window.ConnectCapture(capture, viewModel.MaskPipeline, virtualCamera);
             window.SetSettings(settings);
 
             desktop.MainWindow = window;
 
             desktop.Exit += async (_, _) =>
             {
+                virtualCamera.Dispose();
                 await capture.StopPreviewAsync();
                 await capture.DisposeAsync();
                 mediaLibrary.Dispose();

@@ -221,6 +221,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private string _busyText = "Working…";
     [ObservableProperty] private bool _isVideoMode;
     [ObservableProperty] private bool _isMaskEnabled;
+    [ObservableProperty] private bool _isVirtualCamEnabled;
 
     public MainWindowViewModel(
         ICaptureService capture,
