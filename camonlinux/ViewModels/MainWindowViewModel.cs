@@ -77,14 +77,17 @@ public partial class MainWindowViewModel : ViewModelBase
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
 
-        LoadEffects();
-        SelectedEffect = Effects.FirstOrDefault();
+        // Effects are loaded in InitializeAsync (after GStreamer is initialized) —
+        // ElementFactory.Find returns nothing before gst_init, so frei0r effects
+        // would otherwise be filtered out as unavailable.
 
         _capture.ErrorOccurred += (_, message) => StatusMessage = message;
     }
 
     private void LoadEffects()
     {
+        Effects.Clear();
+
         Effects.Add(new EffectOption("none", "None", ""));
         Effects.Add(new EffectOption("bulge", "Bulge", "bulge"));
         Effects.Add(new EffectOption("dicetv", "Dice TV", "dicetv"));
@@ -158,6 +161,12 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = "Looking for cameras…";
 
         await _capture.InitializeAsync();
+
+        // GStreamer is initialized above — now the registry is populated, so
+        // availability checks (frei0r etc.) reflect what's actually installed.
+        LoadEffects();
+        SelectedEffect = Effects.FirstOrDefault();
+
         var devices = await _capture.RefreshDevicesAsync();
 
         Devices.Clear();
