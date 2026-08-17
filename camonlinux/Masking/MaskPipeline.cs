@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace camonlinux.Masking;
 
@@ -78,11 +80,37 @@ public sealed class MaskPipeline
     }
 
     // --- buffer helpers (hot loops: no LINQ, no allocation) ---
+    //
+    // FillAlpha / InvertAlpha are SIMD-vectorised with System.Numerics.Vector<byte>:
+    // the frame alpha bytes live at indices 3,7,11,… (stride 4), so a vector of
+    // 16/32 bytes covers 4/8 pixels. Vector.ConditionalSelect keeps the RGB bytes
+    // untouched. AndCoverage stays scalar because it must combine a strided alpha
+    // with a contiguous coverage buffer (not SIMD-friendly); it's already a tight
+    // multiply+divide loop and runs per mask producer.
+
+    private static readonly Vector<byte> s_alphaMask = BuildAlphaMask();
+
+    private static Vector<byte> BuildAlphaMask()
+    {
+        Span<byte> m = stackalloc byte[Vector<byte>.Count];
+        for (var i = 3; i < m.Length; i += 4)
+            m[i] = 0xFF;
+        return new Vector<byte>(m);
+    }
 
     private static void FillAlpha(byte[] data, int count, byte value)
     {
-        for (var i = 3; i < count * 4; i += 4)
-            data[i] = value;
+        var fill = new Vector<byte>(value);
+        var byteLen = count * 4;
+        var i = 0;
+        for (; i + Vector<byte>.Count <= byteLen; i += Vector<byte>.Count)
+        {
+            var v = Vector.LoadUnsafe(ref data[i]);
+            var nv = Vector.ConditionalSelect(s_alphaMask, fill, v);
+            nv.CopyTo(data.AsSpan(i));
+        }
+        for (var p = i / 4; p < count; p++)
+            data[p * 4 + 3] = value;
     }
 
     private static void AndCoverage(byte[] data, int count, byte[] coverage)
@@ -97,7 +125,17 @@ public sealed class MaskPipeline
 
     private static void InvertAlpha(byte[] data, int count)
     {
-        for (var p = 0; p < count; p++)
+        var byteLen = count * 4;
+        var i = 0;
+        for (; i + Vector<byte>.Count <= byteLen; i += Vector<byte>.Count)
+        {
+            var v = Vector.LoadUnsafe(ref data[i]);
+            // 255 - alpha at the alpha byte; keep RGB via ConditionalSelect.
+            var inv = new Vector<byte>(255) - (v & s_alphaMask);
+            var nv = Vector.ConditionalSelect(s_alphaMask, inv, v);
+            nv.CopyTo(data.AsSpan(i));
+        }
+        for (var p = i / 4; p < count; p++)
             data[p * 4 + 3] = (byte)(255 - data[p * 4 + 3]);
     }
 }
