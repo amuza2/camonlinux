@@ -23,6 +23,7 @@ public partial class MaskEditorViewModel : ObservableObject
     public Masking.ChromaKeyMaskSettings Chroma { get; }
     public Masking.SvgMaskSettings Svg { get; }
     public Masking.BsmMaskSettings Bsm { get; }
+    public Masking.SourceMaskSettings Source { get; }
 
     private readonly Masking.IMaskEffect _shapeEffect;
     private readonly Masking.IMaskEffect _gradientEffect;
@@ -31,6 +32,7 @@ public partial class MaskEditorViewModel : ObservableObject
     private readonly Masking.IMaskEffect _adjustmentEffect;
     private readonly Masking.IMaskEffect _svgEffect;
     private readonly Masking.IMaskEffect _bsmEffect;
+    private readonly Masking.IMaskEffect _sourceEffect;
 
     public string[] MaskModeOptions { get; } = { "Alpha Mask", "Adjustment Mask" };
     public string[] ShapeOptions { get; } =
@@ -42,8 +44,20 @@ public partial class MaskEditorViewModel : ObservableObject
     public string[] FeatherTypeOptions { get; } = { "None", "Inner", "Middle", "Outer" };
     public string[] SuperformulaModeOptions { get; } = { "Squircle", "Superellipse", "General" };
     public string[] SvgScaleByOptions { get; } = { "Width", "Height", "Both" };
+    public string[] SourceChannelOptions { get; } = { "Red", "Green", "Blue", "Alpha" };
+    public string[] SourceFilterOptions { get; } = { "Alpha", "Grayscale", "Luminosity" };
+    public string[] SourceCompressionOptions { get; } = { "None", "Threshold", "Range" };
+    public string[] SourceScaleByOptions { get; } = { "Percent", "Width", "Height", "Separate", "Stretch", "Manual" };
+    public string[] SourceBoundaryOptions { get; } = { "None", "Tile", "Mirror", "Extend" };
+    public string[] SourceAlignmentOptions { get; } = { "TL", "TC", "TR", "CL", "CC", "CR", "BL", "BC", "BR" };
 
     [ObservableProperty] private int _svgScaleByIndex;
+    [ObservableProperty] private int _sourceChannelIndex;
+    [ObservableProperty] private int _sourceFilterIndex;
+    [ObservableProperty] private int _sourceCompressionIndex;
+    [ObservableProperty] private int _sourceScaleByIndex;
+    [ObservableProperty] private int _sourceBoundaryIndex;
+    [ObservableProperty] private int _sourceAlignmentIndex;
 
     [ObservableProperty] private bool _enabled;
     [ObservableProperty] private int _modeIndex;
@@ -63,6 +77,7 @@ public partial class MaskEditorViewModel : ObservableObject
     [ObservableProperty] private bool _adjustmentEnabled;
     [ObservableProperty] private bool _svgEnabled;
     [ObservableProperty] private bool _bsmEnabled;
+    [ObservableProperty] private bool _sourceEnabled;
 
     public MaskEditorViewModel(
         Masking.MaskPipeline pipeline,
@@ -73,13 +88,15 @@ public partial class MaskEditorViewModel : ObservableObject
         Masking.ChromaKeyMaskSettings chroma,
         Masking.SvgMaskSettings svg,
         Masking.BsmMaskSettings bsm,
+        Masking.SourceMaskSettings source,
         Masking.IMaskEffect shapeEffect,
         Masking.IMaskEffect gradientEffect,
         Masking.IMaskEffect chromaEffect,
         Masking.IMaskEffect featherEffect,
         Masking.IMaskEffect adjustmentEffect,
         Masking.IMaskEffect svgEffect,
-        Masking.IMaskEffect bsmEffect)
+        Masking.IMaskEffect bsmEffect,
+        Masking.IMaskEffect sourceEffect)
     {
         Pipeline = pipeline;
         Shape = shape;
@@ -89,6 +106,7 @@ public partial class MaskEditorViewModel : ObservableObject
         Chroma = chroma;
         Svg = svg;
         Bsm = bsm;
+        Source = source;
         _shapeEffect = shapeEffect;
         _gradientEffect = gradientEffect;
         _chromaEffect = chromaEffect;
@@ -96,6 +114,7 @@ public partial class MaskEditorViewModel : ObservableObject
         _adjustmentEffect = adjustmentEffect;
         _svgEffect = svgEffect;
         _bsmEffect = bsmEffect;
+        _sourceEffect = sourceEffect;
         _enabled = pipeline.Enabled;
         _modeIndex = pipeline.Mode == Masking.MaskMode.Adjustment ? 1 : 0;
         _invert = pipeline.Invert;
@@ -111,7 +130,14 @@ public partial class MaskEditorViewModel : ObservableObject
         _adjustmentEnabled = adjustmentEffect.Enabled;
         _svgEnabled = svgEffect.Enabled;
         _bsmEnabled = bsmEffect.Enabled;
+        _sourceEnabled = sourceEffect.Enabled;
         _svgScaleByIndex = (int)svg.ScaleBy;
+        _sourceChannelIndex = (int)source.Channel;
+        _sourceFilterIndex = (int)source.Filter;
+        _sourceCompressionIndex = (int)source.Compression;
+        _sourceScaleByIndex = (int)source.ScaleBy;
+        _sourceBoundaryIndex = (int)source.Boundary;
+        _sourceAlignmentIndex = (int)source.Alignment;
         shape.PropertyChanged += OnShapeSettingsChanged;
         RefreshEffectOrder();
     }
@@ -138,6 +164,20 @@ public partial class MaskEditorViewModel : ObservableObject
     partial void OnSvgEnabledChanged(bool value) => _svgEffect.Enabled = value;
     partial void OnSvgScaleByIndexChanged(int value) => Svg.ScaleBy = (Masking.SvgScaleBy)value;
     partial void OnBsmEnabledChanged(bool value) => _bsmEffect.Enabled = value;
+
+    partial void OnSourceEnabledChanged(bool value)
+    {
+        _sourceEffect.Enabled = value;
+        if (!value && _sourceEffect is Masking.Effects.SourceMaskEffect sm)
+            sm.Stop();
+    }
+
+    partial void OnSourceChannelIndexChanged(int value) => Source.Channel = (Masking.SourceChannel)value;
+    partial void OnSourceFilterIndexChanged(int value) => Source.Filter = (Masking.SourceFilter)value;
+    partial void OnSourceCompressionIndexChanged(int value) => Source.Compression = (Masking.SourceCompression)value;
+    partial void OnSourceScaleByIndexChanged(int value) => Source.ScaleBy = (Masking.SourceScaleBy)value;
+    partial void OnSourceBoundaryIndexChanged(int value) => Source.Boundary = (Masking.SourceBoundary)value;
+    partial void OnSourceAlignmentIndexChanged(int value) => Source.Alignment = (Masking.SourceAlignment)value;
 
     [RelayCommand]
     private void CaptureBsmBackground() => Bsm.CaptureBackground = true;

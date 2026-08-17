@@ -312,6 +312,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var chroma = new ChromaKeyMaskSettings();
         var svg = new SvgMaskSettings();
         var bsm = new BsmMaskSettings();
+        var source = new SourceMaskSettings();
         var pipeline = new MaskPipeline();
         var shapeEffect = new ShapeMaskEffect(shape);
         var gradientEffect = new GradientMaskEffect(gradient);
@@ -320,6 +321,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var adjustmentEffect = new ColorAdjustmentMaskEffect(adjustment);
         var svgEffect = new SvgMaskEffect(svg);
         var bsmEffect = new BsmMaskEffect(bsm);
+        var sourceEffect = new SourceMaskEffect(source);
         pipeline.Effects.Add(shapeEffect);
         pipeline.Effects.Add(gradientEffect);
         pipeline.Effects.Add(chromaEffect);
@@ -327,10 +329,12 @@ public partial class MainWindowViewModel : ViewModelBase
         pipeline.Effects.Add(adjustmentEffect);
         pipeline.Effects.Add(svgEffect);
         pipeline.Effects.Add(bsmEffect);
+        pipeline.Effects.Add(sourceEffect);
         MaskPipeline = pipeline;
         MaskEditor = new MaskEditorViewModel(
-            pipeline, shape, gradient, feather, adjustment, chroma, svg, bsm,
-            shapeEffect, gradientEffect, chromaEffect, featherEffect, adjustmentEffect, svgEffect, bsmEffect);
+            pipeline, shape, gradient, feather, adjustment, chroma, svg, bsm, source,
+            shapeEffect, gradientEffect, chromaEffect, featherEffect, adjustmentEffect,
+            svgEffect, bsmEffect, sourceEffect);
 
         // Keep the toolbar Mask toggle and the editor's Enable toggle in sync; the
         // pipeline is only applied when enabled.

@@ -216,3 +216,50 @@ public partial class BsmMaskSettings : ObservableObject
         CaptureBackground = false; ResetBackground = false;
     }
 }
+
+public enum SourceChannel { Red, Green, Blue, Alpha }
+public enum SourceFilter { Alpha, Grayscale, Luminosity }
+public enum SourceCompression { None, Threshold, Range }
+public enum SourceScaleBy { Percent, Width, Height, Separate, Stretch, Manual }
+public enum SourceBoundary { None, Tile, Mirror, Extend }
+public enum SourceAlignment { TL, TC, TR, CL, CC, CR, BL, BC, BR }
+
+/// <summary>Parameters for the Source mask (a second webcam used as the mask).</summary>
+public partial class SourceMaskSettings : ObservableObject
+{
+    [ObservableProperty] private string _device = "";          // e.g. /dev/video2
+    [ObservableProperty] private SourceChannel _channel = SourceChannel.Green;
+    [ObservableProperty] private SourceFilter _filter = SourceFilter.Grayscale;
+    [ObservableProperty] private double _multiplier = 1;
+    [ObservableProperty] private bool _useThreshold;
+    [ObservableProperty] private double _threshold = 128;
+    [ObservableProperty] private SourceCompression _compression = SourceCompression.None;
+    [ObservableProperty] private double _rangeMin;
+    [ObservableProperty] private double _rangeMax = 255;
+    [ObservableProperty] private SourceScaleBy _scaleBy = SourceScaleBy.Percent;
+    [ObservableProperty] private double _scale = 100;
+    [ObservableProperty] private double _width = 640;
+    [ObservableProperty] private double _height = 480;
+    [ObservableProperty] private double _offsetX;
+    [ObservableProperty] private double _offsetY;
+    [ObservableProperty] private SourceBoundary _boundary = SourceBoundary.Extend;
+    [ObservableProperty] private int _rotation;                 // 0/90/180/270
+    [ObservableProperty] private SourceAlignment _alignment = SourceAlignment.CC;
+    [ObservableProperty] private double _positionX;
+    [ObservableProperty] private double _positionY;
+    [ObservableProperty] private bool _invert;
+
+    public void Reset()
+    {
+        Device = "";
+        Channel = SourceChannel.Green; Filter = SourceFilter.Grayscale;
+        Multiplier = 1;
+        UseThreshold = false; Threshold = 128;
+        Compression = SourceCompression.None; RangeMin = 0; RangeMax = 255;
+        ScaleBy = SourceScaleBy.Percent; Scale = 100; Width = 640; Height = 480;
+        OffsetX = 0; OffsetY = 0;
+        Boundary = SourceBoundary.Extend; Rotation = 0;
+        Alignment = SourceAlignment.CC; PositionX = 0; PositionY = 0;
+        Invert = false;
+    }
+}
