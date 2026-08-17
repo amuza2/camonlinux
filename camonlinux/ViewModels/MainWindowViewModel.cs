@@ -21,9 +21,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly MediaLibraryService _mediaLibrary;
     private readonly Stopwatch _recordingStopwatch = new();
     private Timer? _recordingTimer;
+    private Timer? _burstTimer;
 
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
+    public ObservableCollection<EffectOption> Effects { get; } = new();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -37,6 +39,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleBurstCommand))]
     private bool _isPreviewActive;
 
     [ObservableProperty] private bool _isRecording;
@@ -46,6 +49,20 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _mirrored;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
+    private EffectOption? _selectedEffect;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleBurstCommand))]
+    private bool _isBurstActive;
+
+    [ObservableProperty] private string _burstButtonText = "Burst";
+    [ObservableProperty] private bool _showEffectsPanel;
 
     public MainWindowViewModel(
         ICaptureService capture,
@@ -57,7 +74,39 @@ public partial class MainWindowViewModel : ViewModelBase
         _mediaLibrary = mediaLibrary;
         _mirrored = settings.Settings.Mirrored;
 
+        LoadEffects();
+        SelectedEffect = Effects.FirstOrDefault();
+
         _capture.ErrorOccurred += (_, message) => StatusMessage = message;
+    }
+
+    private void LoadEffects()
+    {
+        Effects.Add(new EffectOption("none", "None", ""));
+        Effects.Add(new EffectOption("bulge", "Bulge", "bulge"));
+        Effects.Add(new EffectOption("dicetv", "Dice TV", "dicetv"));
+        Effects.Add(new EffectOption("edgetv", "Edge TV", "edgetv"));
+        Effects.Add(new EffectOption("kaleidoscope", "Kaleidoscope", "kaleidoscope"));
+        Effects.Add(new EffectOption("optv", "Opt TV", "optv"));
+        Effects.Add(new EffectOption("pinch", "Pinch", "pinch"));
+        Effects.Add(new EffectOption("quarktv", "Quark TV", "quarktv"));
+        Effects.Add(new EffectOption("radioactv", "Radioactive TV", "radioactv"));
+        Effects.Add(new EffectOption("revtv", "Reverse TV", "revtv"));
+        Effects.Add(new EffectOption("rippletv", "Ripple TV", "rippletv"));
+        Effects.Add(new EffectOption("shagadelictv", "Shagadelic TV", "shagadelictv"));
+        Effects.Add(new EffectOption("square", "Square", "square"));
+        Effects.Add(new EffectOption("streaktv", "Streak TV", "streaktv"));
+        Effects.Add(new EffectOption("stretch", "Stretch", "stretch"));
+        Effects.Add(new EffectOption("twirl", "Twirl", "twirl"));
+        Effects.Add(new EffectOption("vertigotv", "Vertigo TV", "vertigotv"));
+        Effects.Add(new EffectOption("warptv", "Warp TV", "warptv"));
+        Effects.Add(new EffectOption("mirror", "Mirror", "mirror"));
+        Effects.Add(new EffectOption("heat", "Heat", "coloreffects preset=heat"));
+        Effects.Add(new EffectOption("sepia", "Sepia", "coloreffects preset=sepia"));
+        Effects.Add(new EffectOption("xray", "X-Ray", "coloreffects preset=xray"));
+        Effects.Add(new EffectOption("grayscale", "Grayscale", "videobalance saturation=0"));
+        Effects.Add(new EffectOption("vivid", "Vivid", "videobalance saturation=1.5"));
+        Effects.Add(new EffectOption("agingtv", "Aging TV", "videobalance saturation=0 ! agingtv"));
     }
 
     // ------------------------------------------------------------------ //
@@ -129,6 +178,16 @@ public partial class MainWindowViewModel : ViewModelBase
             _ = StartPreviewAsync(SelectedDevice);
     }
 
+    partial void OnSelectedEffectChanged(EffectOption? value)
+    {
+        _capture.Effect = value?.Filter ?? "";
+
+        // The effect is baked into the pipeline, so restart the preview.
+        // (Not while recording — it applies when the preview resumes.)
+        if (IsPreviewActive && !IsRecording && SelectedDevice is not null)
+            _ = StartPreviewAsync(SelectedDevice);
+    }
+
     // ------------------------------------------------------------------ //
     // Device management
     // ------------------------------------------------------------------ //
@@ -149,16 +208,16 @@ public partial class MainWindowViewModel : ViewModelBase
     // ------------------------------------------------------------------ //
 
     [RelayCommand(CanExecute = nameof(CanTakePhoto))]
-    private async Task TakePhotoAsync()
+    private Task TakePhotoAsync() => CapturePhotoAsync();
+
+    private async Task CapturePhotoAsync()
     {
-        var directory = _settings.Settings.PhotoDirectory;
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"picture_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.jpg");
+        var path = NextPhotoPath(_settings.Settings.PhotoDirectory);
 
         try
         {
             await _capture.TakePhotoAsync(path);
-            StatusMessage = $"Photo saved to {path}";
+            StatusMessage = $"Photo saved to {Path.GetFileName(path)}";
             NotificationService.Notify("Photo taken", Path.GetFileName(path));
             RefreshGallery();
         }
@@ -168,13 +227,56 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private bool CanTakePhoto() => IsPreviewActive && !IsRecording;
+    private bool CanTakePhoto() => IsPreviewActive && !IsRecording && !IsBurstActive;
+
+    private static string NextPhotoPath(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        var path = Path.Combine(directory, $"picture_{stamp}.jpg");
+        var index = 1;
+        while (File.Exists(path))
+            path = Path.Combine(directory, $"picture_{stamp}_{index++}.jpg");
+        return path;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanToggleBurst))]
+    private void ToggleBurst()
+    {
+        if (_burstTimer is null)
+        {
+            IsBurstActive = true;
+            BurstButtonText = "Burst: On";
+            StatusMessage = "Burst mode — taking a photo every 2.5 seconds.";
+            _burstTimer = new Timer(
+                _ => Dispatcher.UIThread.Post(async () => await CapturePhotoAsync()),
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(2.5));
+        }
+        else
+        {
+            StopBurst();
+            StatusMessage = "Burst stopped.";
+        }
+    }
+
+    private void StopBurst()
+    {
+        _burstTimer?.Dispose();
+        _burstTimer = null;
+        IsBurstActive = false;
+        BurstButtonText = "Burst";
+    }
+
+    private bool CanToggleBurst() => IsPreviewActive && !IsRecording;
 
     [RelayCommand(CanExecute = nameof(CanToggleRecording))]
     private async Task ToggleRecordingAsync()
     {
         if (!IsRecording)
         {
+            StopBurst();
             var directory = _settings.Settings.VideoDirectory;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, $"video_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.mkv");
@@ -210,7 +312,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private bool CanToggleRecording() => IsPreviewActive || IsRecording;
+    private bool CanToggleRecording() => (IsPreviewActive || IsRecording) && !IsBurstActive;
 
     // ------------------------------------------------------------------ //
     // Gallery

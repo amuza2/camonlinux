@@ -49,17 +49,35 @@
             </DockPanel>
         </Border>
 
-        <!-- Gallery panel -->
-        <Border DockPanel.Dock="Right" Width="230" Background="#202020">
+        <!-- Right panel: captures / effects -->
+        <Border DockPanel.Dock="Right" Width="240" Background="#202020">
             <DockPanel>
+                <Grid DockPanel.Dock="Top" Margin="8,10,8,6" ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ToggleButton Grid.Column="0" Content="Captures" IsChecked="{Binding !ShowEffectsPanel}"/>
+                    <ToggleButton Grid.Column="1" Content="Effects" IsChecked="{Binding ShowEffectsPanel}"/>
+                </Grid>
+
                 <Button DockPanel.Dock="Bottom" Margin="8" Content="Delete"
-                        Command="{Binding DeleteSelectedCommand}"/>
-                <TextBlock DockPanel.Dock="Top" Margin="12,10" Text="Recent captures"
-                           FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                        Command="{Binding DeleteSelectedCommand}"
+                        IsVisible="{Binding !ShowEffectsPanel}"/>
+
+                <!-- Effects gallery -->
+                <ListBox ItemsSource="{Binding Effects}"
+                         SelectedItem="{Binding SelectedEffect}"
+                         IsVisible="{Binding ShowEffectsPanel}"
+                         Background="Transparent" Margin="4,0,4,8">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:EffectOption">
+                            <TextBlock Text="{Binding Name}" Margin="6,3"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Recent captures -->
                 <ListBox ItemsSource="{Binding GalleryItems}"
                          SelectedItem="{Binding SelectedGalleryItem}"
-                         Margin="4,0,4,8"
-                         Background="Transparent">
+                         IsVisible="{Binding !ShowEffectsPanel}"
+                         Background="Transparent" Margin="4,0,4,8">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:MediaItem">
                             <TextBlock Text="{Binding Name}"
@@ -80,6 +98,8 @@
                 <Button Content="Take Photo" Command="{Binding TakePhotoCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
+                        FontSize="15" Padding="20,8"/>
+                <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
                         FontSize="15" Padding="20,8"/>
             </StackPanel>
         </Border>

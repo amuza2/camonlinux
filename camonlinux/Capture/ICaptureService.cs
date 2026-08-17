@@ -21,6 +21,10 @@ public interface ICaptureService : IAsyncDisposable
     bool IsPreviewActive { get; }
     bool IsRecording { get; }
     bool Mirrored { get; set; }
+
+    /// <summary>GStreamer filter chain applied to preview, photos and recordings (empty = none).</summary>
+    string Effect { get; set; }
+
     CameraDevice? CurrentDevice { get; }
     IReadOnlyList<CameraDevice> Devices { get; }
 

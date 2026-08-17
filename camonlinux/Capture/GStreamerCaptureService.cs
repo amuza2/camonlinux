@@ -61,6 +61,7 @@ public sealed class GStreamerCaptureService : ICaptureService
     public bool IsPreviewActive => _previewPipeline is not null;
     public bool IsRecording => _recordPipeline is not null;
     public bool Mirrored { get; set; } = true;
+    public string Effect { get; set; } = "";
     public CameraDevice? CurrentDevice => _currentDevice;
     public IReadOnlyList<CameraDevice> Devices => _devices;
 
@@ -198,14 +199,29 @@ public sealed class GStreamerCaptureService : ICaptureService
         if (_currentDevice is null)
             return;
 
+        if (TryBuildPreviewPipeline(Effect))
+            return;
+
+        // The effect failed to parse (e.g. missing plugin) — fall back to no effect.
+        if (!string.IsNullOrWhiteSpace(Effect))
+            ErrorOccurred?.Invoke(this, $"The effect '{Effect}' is not available on this system; continuing without it.");
+        TryBuildPreviewPipeline("");
+    }
+
+    private bool TryBuildPreviewPipeline(string effect)
+    {
         var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
+        var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
         var description =
-            $"v4l2src device={_currentDevice.Path} ! videoconvert ! {flip} " +
+            $"v4l2src device={_currentDevice!.Path} ! videoconvert ! {flip}{effectChain} " +
             "! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
 
         try
         {
             _previewPipeline = Gst.Functions.ParseLaunch(description);
+            if (_previewPipeline is null)
+                return false;
+
             var bin = (Gst.Bin)_previewPipeline;
             _appSink = bin.GetByName("sink") as AppSink
                 ?? throw new InvalidOperationException("Failed to create the preview appsink.");
@@ -213,11 +229,12 @@ public sealed class GStreamerCaptureService : ICaptureService
             _bus = _previewPipeline.GetBus();
             StartBusWatch();
             StartFrameLoop();
+            return true;
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorOccurred?.Invoke(this, $"Could not start the camera pipeline: {ex.Message}");
             StopPreviewInternal();
+            return false;
         }
     }
 
@@ -257,8 +274,9 @@ public sealed class GStreamerCaptureService : ICaptureService
         StopPreviewInternal();
 
         var flip = Mirrored ? "videoflip video-direction=horiz" : "videoflip video-direction=auto";
+        var effectChain = string.IsNullOrWhiteSpace(Effect) ? "" : $" ! {Effect}";
         var description =
-            $"v4l2src device={_currentDevice.Path} ! videoconvert ! {flip} " +
+            $"v4l2src device={_currentDevice.Path} ! videoconvert ! {flip}{effectChain} " +
             "! x264enc speed-preset=veryfast tune=zerolatency ! matroskamux " +
             $"! filesink name=filesink location=\"{path}\"";
 

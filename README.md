@@ -10,6 +10,8 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 
 - Live webcam preview (GStreamer `v4l2src` → `appsink`, rendered on a `WriteableBitmap`)
 - Take photos (JPEG, saved to `~/Pictures`)
+- **Burst mode** — take a photo every 2.5 s
+- **Effects gallery** — 25 live GStreamer effects (kaleidoscope, twirl, sepia, mirror, aging TV, …) applied to preview, photos and recordings
 - Record videos (H.264 + Matroska `.mkv`, saved to `~/Videos`, with on-screen timer)
 - Mirror toggle
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
@@ -113,8 +115,8 @@ v4l2src ! videoconvert ! videoflip ! x264enc ! matroskamux ! filesink
 
 - [ ] Live preview while recording (tee — needs a working gating strategy)
 - [ ] Device hot-plug detection (poll `/dev/video*` / inotify)
-- [ ] Effects gallery (GStreamer frei0r/videobalance filters)
-- [ ] Burst mode
+- [ ] Live effect preview thumbnails in the gallery
+- [ ] frei0r effects (install `frei0r-plugins` + `gst-plugins-bad`)
 - [ ] Video thumbnails in the gallery (decode a frame via a short GStreamer pipeline)
 - [ ] Thumbnails in the gallery (photos)
 - [ ] Audio in recordings (PipeWire/pulse audio capture)
