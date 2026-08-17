@@ -419,7 +419,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
 
         var thumbPath = ThumbCachePath(item.Path);
-        var needsRender = !File.Exists(thumbPath) || File.GetLastWriteTime(thumbPath) < item.ModifiedAt;
+        // Reuse the cache only if it's a valid, fresh, single-frame PNG. A broken
+        // file (e.g. from an older buggy renderer that concatenated thousands of
+        // frames into one huge file) must be re-rendered, not loaded.
+        var needsRender = !IsValidCachedThumbnail(thumbPath)
+                          || File.GetLastWriteTime(thumbPath) < item.ModifiedAt;
 
         if (needsRender)
         {
@@ -435,6 +439,37 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             try { item.Thumbnail = new Bitmap(path); } catch { /* ignore */ }
         });
+    }
+
+    /// <summary>
+    /// True if the cached file is a plausible single-frame PNG: exists, starts
+    /// with the PNG signature, and is small (a 100x56 thumbnail is a few KB — a
+    /// multi-frame concatenation or other garbage is megabytes).
+    /// </summary>
+    private static bool IsValidCachedThumbnail(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return false;
+
+            var info = new FileInfo(path);
+            if (info.Length < 50 || info.Length > 1_000_000)
+                return false;
+
+            using var stream = File.OpenRead(path);
+            var header = new byte[8];
+            if (stream.Read(header, 0, 8) != 8)
+                return false;
+            // PNG magic: 89 50 4E 47 0D 0A 1A 0A
+            return header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E
+                && header[3] == 0x47 && header[4] == 0x0D && header[5] == 0x0A
+                && header[6] == 0x1A && header[7] == 0x0A;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string ThumbCachePath(string filePath)

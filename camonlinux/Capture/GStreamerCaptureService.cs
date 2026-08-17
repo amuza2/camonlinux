@@ -341,6 +341,13 @@ public sealed class GStreamerCaptureService : ICaptureService
             Marshal.Copy(data, 0, bitmap.GetPixels(), data.Length);
             using var image = SKImage.FromBitmap(bitmap);
             using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+
+            // The caller may pass a path in a cache directory that doesn't exist
+            // yet (e.g. /tmp/camonlinux_gallery) — create it before writing.
+            var directory = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
             using var stream = File.Create(outputPath);
             encoded.SaveTo(stream);
 
