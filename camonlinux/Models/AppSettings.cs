@@ -13,6 +13,8 @@ public sealed class AppSettings
     public string RecordQuality { get; set; } = "medium";
     public long MaxFileSizeMB { get; set; }
     public int TimerSeconds { get; set; }
+    public double BurstIntervalSeconds { get; set; } = 2.5;
+    public int BurstPhotoCount { get; set; }
     public string Rotation { get; set; } = "auto";
     public double Zoom { get; set; } = 1.0;
     public string PhotoFormat { get; set; } = "jpeg";

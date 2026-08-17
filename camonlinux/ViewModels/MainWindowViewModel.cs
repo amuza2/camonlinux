@@ -30,6 +30,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stopwatch _recordingStopwatch = new();
     private Timer? _recordingTimer;
     private Timer? _burstTimer;
+    private double _burstIntervalSeconds = 2.5;
+    private int _burstCount;
+    private int _burstTaken;
     private Timer? _photoCountdownTimer;
     private int _timerSeconds;
     private int _countdownRemaining;
@@ -55,6 +58,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RotationOptions { get; } = new() { "0°", "90°", "180°", "270°" };
     public ObservableCollection<string> ZoomOptions { get; } = new() { "1×", "1.5×", "2×", "3×", "4×" };
     public ObservableCollection<string> PhotoFormatOptions { get; } = new() { "JPEG", "PNG" };
+    public ObservableCollection<string> BurstIntervalOptions { get; } = new() { "1 s", "2.5 s", "5 s" };
+    public ObservableCollection<string> BurstCountOptions { get; } = new() { "Unlimited", "5", "10", "20" };
     public ObservableCollection<string> AudioDevices { get; } = new();
     public ObservableCollection<EffectOption> FilteredEffects { get; } = new();
 
@@ -201,6 +206,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty] private string _burstButtonText = "Burst";
     [ObservableProperty] private bool _showEffectsPanel;
+    [ObservableProperty] private string _selectedBurstInterval = "2.5 s";
+    [ObservableProperty] private string _selectedBurstCount = "Unlimited";
+    [ObservableProperty] private string _busyText = "Working…";
 
     public MainWindowViewModel(
         ICaptureService capture,
@@ -231,6 +239,10 @@ public partial class MainWindowViewModel : ViewModelBase
         _selectedMaxSize = MapMaxSizeLabel(settings.Settings.MaxFileSizeMB);
         _timerSeconds = settings.Settings.TimerSeconds;
         _selectedTimer = MapTimerLabel(settings.Settings.TimerSeconds);
+        _burstIntervalSeconds = settings.Settings.BurstIntervalSeconds;
+        _burstCount = settings.Settings.BurstPhotoCount;
+        _selectedBurstInterval = MapBurstIntervalLabel(_burstIntervalSeconds);
+        _selectedBurstCount = _burstCount == 0 ? "Unlimited" : _burstCount.ToString();
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
@@ -396,6 +408,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public async Task InitializeAsync()
     {
         IsBusy = true;
+        BusyText = "Looking for cameras…";
         StatusMessage = "Looking for cameras…";
 
         await _capture.InitializeAsync();
@@ -479,6 +492,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     private async Task OnDeviceSelectedAsync(CameraDevice device)
     {
+        BusyText = "Opening camera…";
         await LoadResolutionsAsync(device);
         UpdateSupportedControlVisibility(device);
         await StartPreviewAsync(device);
@@ -588,6 +602,49 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.TimerSeconds = _timerSeconds;
         _settings.Save();
         CancelPhotoCountdown();
+    }
+
+    partial void OnSelectedBurstIntervalChanged(string value)
+    {
+        _burstIntervalSeconds = value switch { "1 s" => 1.0, "5 s" => 5.0, _ => 2.5 };
+        _settings.Settings.BurstIntervalSeconds = _burstIntervalSeconds;
+        _settings.Save();
+    }
+
+    partial void OnSelectedBurstCountChanged(string value)
+    {
+        _burstCount = value switch { "5" => 5, "10" => 10, "20" => 20, _ => 0 };
+        _settings.Settings.BurstPhotoCount = _burstCount;
+        _settings.Save();
+    }
+
+    private static string MapBurstIntervalLabel(double seconds) => seconds switch
+    {
+        <= 1.2 => "1 s",
+        >= 4.5 => "5 s",
+        _ => "2.5 s"
+    };
+
+    private const long LowDiskThresholdBytes = 300L * 1024 * 1024;
+
+    /// <summary>True if the drive hosting the directory has enough free space; warns otherwise.</summary>
+    private bool HasEnoughDiskSpace(string directory)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(directory)) ?? directory;
+            var free = new DriveInfo(root).AvailableFreeSpace;
+            if (free > LowDiskThresholdBytes)
+                return true;
+            var mb = free / 1024.0 / 1024.0;
+            StatusMessage = $"Low disk space — only {mb:0.#} MB free.";
+            ShowToast($"Low disk space ({mb:0.#} MB free)");
+            return false;
+        }
+        catch
+        {
+            return true; // can't determine the size — allow
+        }
     }
 
     private static string MapTimerLabel(int seconds) => seconds switch { 3 => "3 s", 10 => "10 s", _ => "Off" };
@@ -1058,15 +1115,30 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_burstTimer is null)
         {
+            if (!HasEnoughDiskSpace(_settings.Settings.PhotoDirectory))
+                return;
             CancelPhotoCountdown();
+            _burstTaken = 0;
             IsBurstActive = true;
             BurstButtonText = "Burst: On";
-            StatusMessage = "Burst mode — taking a photo every 2.5 seconds.";
+            StatusMessage = _burstCount > 0
+                ? $"Burst mode — up to {_burstCount} photos, every {_burstIntervalSeconds:0.#}s."
+                : $"Burst mode — a photo every {_burstIntervalSeconds:0.#}s.";
             _burstTimer = new Timer(
-                _ => Dispatcher.UIThread.Post(async () => await CapturePhotoAsync()),
+                _ => Dispatcher.UIThread.Post(() =>
+                {
+                    if (_burstCount > 0 && _burstTaken >= _burstCount)
+                    {
+                        StopBurst();
+                        StatusMessage = $"Burst finished — {_burstTaken} photos taken.";
+                        return;
+                    }
+                    _burstTaken++;
+                    _ = CapturePhotoAsync();
+                }),
                 null,
                 TimeSpan.Zero,
-                TimeSpan.FromSeconds(2.5));
+                TimeSpan.FromMilliseconds(_burstIntervalSeconds * 1000));
         }
         else
         {
@@ -1090,6 +1162,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (!IsRecording)
         {
+            if (!HasEnoughDiskSpace(_settings.Settings.VideoDirectory))
+                return;
             StopBurst();
             CancelPhotoCountdown();
             var directory = _settings.Settings.VideoDirectory;

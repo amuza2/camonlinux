@@ -292,6 +292,13 @@
                     <TextBlock Text="Format" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{Binding PhotoFormatOptions}" SelectedItem="{Binding SelectedPhotoFormat}" Width="68"/>
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Burst" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding BurstIntervalOptions}" SelectedItem="{Binding SelectedBurstInterval}" Width="56"
+                              ToolTip.Tip="Time between burst photos"/>
+                    <ComboBox ItemsSource="{Binding BurstCountOptions}" SelectedItem="{Binding SelectedBurstCount}" Width="64"
+                              ToolTip.Tip="Number of burst photos (Unlimited = until stopped)"/>
+                </StackPanel>
                 <Button Content="Record" Command="{Binding ToggleRecordingCommand}"
                         FontSize="15" Padding="20,8"/>
                 <Button Content="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
@@ -305,7 +312,7 @@
             <Border Background="#80000000" CornerRadius="6" Padding="14,8"
                     IsVisible="{Binding IsBusy}"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="Looking for cameras…" Foreground="White"/>
+                <TextBlock Text="{Binding BusyText}" Foreground="White"/>
             </Border>
             <TextBlock Text="{Binding StatusMessage}" Foreground="White"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
