@@ -70,9 +70,15 @@
                     <ToggleButton Grid.Column="1" Content="Effects" IsChecked="{Binding ShowEffectsPanel}"/>
                 </Grid>
 
-                <Button DockPanel.Dock="Bottom" Margin="8" Content="Delete"
-                        Command="{Binding DeleteSelectedCommand}"
-                        IsVisible="{Binding !ShowEffectsPanel}"/>
+                <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
+                            IsVisible="{Binding !ShowEffectsPanel}">
+                    <Button Content="Rename" Command="{Binding RenameSelectedCommand}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="Copy" Command="{Binding CopySelectedCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Content="Move" Command="{Binding MoveSelectedCommand}" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                    <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"/>
+                </StackPanel>
 
                 <!-- Effects gallery -->
                 <ListBox ItemsSource="{Binding Effects}"

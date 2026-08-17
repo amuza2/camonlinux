@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="camonlinux.Views.RenameDialog"
+        Title="Rename media"
+        Width="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="12">
+        <TextBlock Text="New file name (without extension)" FontWeight="SemiBold"/>
+        <TextBox x:Name="NameBox" MinWidth="300"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel" Click="OnCancel" MinWidth="80"/>
+            <Button Content="OK" Classes="accent" Click="OnOk" MinWidth="80"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

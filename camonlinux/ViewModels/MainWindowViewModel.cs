@@ -6,11 +6,16 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using camonlinux.Capture;
 using camonlinux.Models;
 using camonlinux.Services;
+using camonlinux.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -913,6 +918,121 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private bool CanDeleteSelected() => SelectedGalleryItem is not null;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
+    private async Task RenameSelectedAsync()
+    {
+        var item = SelectedGalleryItem;
+        if (item is null)
+            return;
+
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+
+        var dialog = new RenameDialog(Path.GetFileNameWithoutExtension(item.Name));
+        var newBase = await dialog.ShowDialog<string?>(owner);
+        if (string.IsNullOrWhiteSpace(newBase))
+            return;
+
+        var dir = Path.GetDirectoryName(item.Path) ?? "";
+        var newPath = Path.Combine(dir, newBase + item.Extension);
+        if (string.Equals(newPath, item.Path, StringComparison.Ordinal))
+            return;
+
+        try
+        {
+            if (File.Exists(newPath))
+            {
+                StatusMessage = "A file with that name already exists.";
+                return;
+            }
+            File.Move(item.Path, newPath);
+            StatusMessage = $"Renamed to {Path.GetFileName(newPath)}";
+            RefreshGallery();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not rename: {ex.Message}";
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
+    private async Task CopySelectedAsync()
+    {
+        var item = SelectedGalleryItem;
+        if (item is null)
+            return;
+
+        var dest = await PickFolderAsync();
+        if (dest is null)
+            return;
+
+        try
+        {
+            var target = UniquePath(Path.Combine(dest, item.Name));
+            File.Copy(item.Path, target);
+            StatusMessage = $"Copied to {Path.GetFileName(target)}";
+            RefreshGallery();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not copy: {ex.Message}";
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
+    private async Task MoveSelectedAsync()
+    {
+        var item = SelectedGalleryItem;
+        if (item is null)
+            return;
+
+        var dest = await PickFolderAsync();
+        if (dest is null)
+            return;
+
+        try
+        {
+            var target = UniquePath(Path.Combine(dest, item.Name));
+            File.Move(item.Path, target);
+            StatusMessage = $"Moved to {Path.GetFileName(target)}";
+            RefreshGallery();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not move: {ex.Message}";
+        }
+    }
+
+    private static Window? MainWindow =>
+        Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
+            : null;
+
+    private static async Task<string?> PickFolderAsync()
+    {
+        var owner = MainWindow;
+        if (owner is null)
+            return null;
+
+        var dirs = await owner.StorageProvider.OpenFolderPickerAsync(
+            new FolderPickerOpenOptions { Title = "Choose a folder" });
+        return dirs.Count > 0 ? dirs[0].Path.LocalPath : null;
+    }
+
+    private static string UniquePath(string path)
+    {
+        if (!File.Exists(path))
+            return path;
+        var dir = Path.GetDirectoryName(path) ?? "";
+        var name = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+        var i = 1;
+        while (File.Exists(Path.Combine(dir, $"{name}-{i}{ext}")))
+            i++;
+        return Path.Combine(dir, $"{name}-{i}{ext}");
+    }
 
     [RelayCommand]
     private void OpenMediaFolder()
