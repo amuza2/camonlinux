@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="camonlinux.Views.PhotoViewerWindow"
+        Width="1000" Height="700"
+        MinWidth="400" MinHeight="300"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E">
+    <DockPanel>
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
+            <DockPanel>
+                <TextBlock x:Name="TitleText" Foreground="#DDDDDD" VerticalAlignment="Center" FontSize="14"
+                           TextTrimming="CharacterEllipsis"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                    <Button Content="&#x2212;" ToolTip.Tip="Zoom out" Width="36" Click="OnZoomOut"/>
+                    <Button Content="+" ToolTip.Tip="Zoom in" Width="36" Click="OnZoomIn"/>
+                    <Button Content="1:1" ToolTip.Tip="Actual size" Click="OnZoomReset"/>
+                    <Button Content="Fit" ToolTip.Tip="Fit to window" Click="OnZoomFit"/>
+                    <Button Content="Close" ToolTip.Tip="Close viewer" Click="OnClose"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Zoomable, pannable image -->
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      Background="#1E1E1E">
+            <Border x:Name="Canvas" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#1E1E1E"
+                    PointerWheelChanged="OnWheel" PointerPressed="OnPressed" PointerMoved="OnMoved"
+                    PointerReleased="OnReleased">
+                <Image x:Name="Photo" Stretch="Fill" RenderOptions.BitmapInterpolationMode="HighQuality"
+                       Margin="16"/>
+            </Border>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

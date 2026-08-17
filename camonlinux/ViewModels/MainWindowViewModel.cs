@@ -1252,12 +1252,35 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private bool CanPlaySelected() => SelectedGalleryItem is { IsVideo: true };
 
-    /// <summary>Opens the selected gallery item (photo or video) with the default app.</summary>
+    /// <summary>Opens the selected gallery item: photos in the in-app viewer, videos with the system player.</summary>
     [RelayCommand]
     private void OpenSelected()
     {
-        if (SelectedGalleryItem is not null)
-            OpenWithDefaultApp(SelectedGalleryItem.Path);
+        var item = SelectedGalleryItem;
+        if (item is null)
+            return;
+        if (item.IsVideo)
+        {
+            OpenWithDefaultApp(item.Path);
+            return;
+        }
+        OpenPhotoViewer(item.Path);
+    }
+
+    /// <summary>Opens a photo in the in-app full-size viewer (zoom/pan).</summary>
+    private void OpenPhotoViewer(string path)
+    {
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+        try
+        {
+            new PhotoViewerWindow(path).Show(owner);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not open photo: {ex.Message}";
+        }
     }
 
     /// <summary>Opens a file or folder with the system default application (xdg-open).</summary>
