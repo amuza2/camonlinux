@@ -169,6 +169,12 @@
                 <TextBox DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search effects…"
                          Text="{Binding EffectFilter}" IsVisible="{Binding ShowEffectsPanel}"/>
 
+                <StackPanel DockPanel.Dock="Top" Margin="8,0,8,4" Orientation="Horizontal" Spacing="4"
+                            IsVisible="{Binding !ShowEffectsPanel}">
+                    <ComboBox ItemsSource="{Binding GalleryFilterOptions}" SelectedItem="{Binding SelectedGalleryFilter}" Width="70"/>
+                    <ComboBox ItemsSource="{Binding GallerySortOptions}" SelectedItem="{Binding SelectedGallerySort}" Width="92"/>
+                </StackPanel>
+
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
                             IsVisible="{Binding !ShowEffectsPanel}">
                     <Button Content="Play video" Command="{Binding PlaySelectedCommand}"/>
@@ -227,6 +233,8 @@
                 <!-- Recent captures -->
                 <ListBox ItemsSource="{Binding GalleryItems}"
                          SelectedItem="{Binding SelectedGalleryItem}"
+                         SelectionMode="Multiple"
+                         SelectionChanged="OnGallerySelectionChanged"
                          DoubleTapped="OnGalleryDoubleTapped"
                          IsVisible="{Binding !ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">

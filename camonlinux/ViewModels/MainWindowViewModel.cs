@@ -50,6 +50,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<CameraDevice> Devices { get; } = new();
     public ObservableCollection<MediaItem> GalleryItems { get; } = new();
+    public ObservableCollection<string> GalleryFilterOptions { get; } = new() { "All", "Photos", "Videos" };
+    public ObservableCollection<string> GallerySortOptions { get; } = new() { "Newest", "Oldest", "Name" };
+    public ObservableCollection<MediaItem> SelectedGalleryItems { get; } = new();
     public ObservableCollection<EffectOption> Effects { get; } = new();
     public ObservableCollection<string> Resolutions { get; } = new();
     public ObservableCollection<string> QualityOptions { get; } = new() { "Low", "Medium", "High" };
@@ -72,6 +75,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(DeleteSelectedCommand))]
     [NotifyCanExecuteChangedFor(nameof(PlaySelectedCommand))]
     private MediaItem? _selectedGalleryItem;
+
+    [ObservableProperty] private string _selectedGalleryFilter = "All";
+    [ObservableProperty] private string _selectedGallerySort = "Newest";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
@@ -1218,18 +1224,36 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void RefreshGallery()
     {
-        var items = _mediaLibrary.LoadMedia(_settings.Settings.PhotoDirectory)
-            .Concat(_mediaLibrary.LoadMedia(_settings.Settings.VideoDirectory))
-            .OrderByDescending(item => item.ModifiedAt)
-            .Take(60);
+        var all = _mediaLibrary.LoadMedia(_settings.Settings.PhotoDirectory)
+            .Concat(_mediaLibrary.LoadMedia(_settings.Settings.VideoDirectory));
+
+        // Filter: all, photos or videos.
+        var filtered = SelectedGalleryFilter switch
+        {
+            "Photos" => all.Where(i => !i.IsVideo),
+            "Videos" => all.Where(i => i.IsVideo),
+            _ => all
+        };
+
+        // Sort: newest, oldest or by name.
+        var sorted = SelectedGallerySort switch
+        {
+            "Oldest" => filtered.OrderBy(i => i.ModifiedAt),
+            "Name" => filtered.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase),
+            _ => filtered.OrderByDescending(i => i.ModifiedAt)
+        };
 
         GalleryItems.Clear();
-        foreach (var item in items)
+        foreach (var item in sorted.Take(60))
             GalleryItems.Add(item);
 
         UpdateGalleryEmptyHint();
         _ = GenerateGalleryThumbnailsAsync();
     }
+
+    partial void OnSelectedGalleryFilterChanged(string value) => RefreshGallery();
+
+    partial void OnSelectedGallerySortChanged(string value) => RefreshGallery();
 
     /// <summary>Generates thumbnails for gallery items (photos and videos), cached on disk.</summary>
     private async Task GenerateGalleryThumbnailsAsync()
@@ -1469,27 +1493,42 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private async Task DeleteSelectedAsync()
     {
-        var item = SelectedGalleryItem;
-        if (item is null)
+        var items = SelectedItems();
+        if (items.Count == 0)
             return;
 
         var owner = MainWindow;
         if (owner is null)
             return;
 
-        var confirmed = await new ConfirmDialog("Move to trash", $"Move \"{item.Name}\" to the trash?").ShowDialog<bool>(owner);
+        var confirmed = await new ConfirmDialog("Move to trash",
+            items.Count == 1 ? $"Move \"{items[0].Name}\" to the trash?" : $"Move {items.Count} items to the trash?").ShowDialog<bool>(owner);
         if (!confirmed)
             return;
 
-        if (TrashService.Trash(item.Path))
+        var trashed = 0;
+        foreach (var item in items)
         {
-            GalleryItems.Remove(item);
-            UpdateGalleryEmptyHint();
-            ShowToast("Moved to trash");
+            if (TrashService.Trash(item.Path))
+            {
+                GalleryItems.Remove(item);
+                trashed++;
+            }
         }
+        SelectedGalleryItems.Clear();
+        UpdateGalleryEmptyHint();
+        ShowToast(trashed == 1 ? "Moved to trash" : $"Moved {trashed} items to trash");
     }
 
-    private bool CanDeleteSelected() => SelectedGalleryItem is not null;
+    private bool CanDeleteSelected() => SelectedGalleryItem is not null || SelectedGalleryItems.Count > 0;
+
+    /// <summary>All selected items (multi-selection), falling back to the single selection.</summary>
+    private List<MediaItem> SelectedItems()
+    {
+        if (SelectedGalleryItems.Count > 0)
+            return SelectedGalleryItems.ToList();
+        return SelectedGalleryItem is null ? new List<MediaItem>() : new List<MediaItem> { SelectedGalleryItem };
+    }
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private async Task RenameSelectedAsync()
@@ -1532,8 +1571,8 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private async Task CopySelectedAsync()
     {
-        var item = SelectedGalleryItem;
-        if (item is null)
+        var items = SelectedItems();
+        if (items.Count == 0)
             return;
 
         var dest = await PickFolderAsync();
@@ -1542,9 +1581,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            var target = UniquePath(Path.Combine(dest, item.Name));
-            File.Copy(item.Path, target);
-            StatusMessage = $"Copied to {Path.GetFileName(target)}";
+            foreach (var item in items)
+            {
+                var target = UniquePath(Path.Combine(dest, item.Name));
+                File.Copy(item.Path, target);
+            }
+            StatusMessage = items.Count == 1 ? $"Copied to {Path.GetFileName(dest)}" : $"Copied {items.Count} items";
             RefreshGallery();
         }
         catch (Exception ex)
@@ -1556,8 +1598,8 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDeleteSelected))]
     private async Task MoveSelectedAsync()
     {
-        var item = SelectedGalleryItem;
-        if (item is null)
+        var items = SelectedItems();
+        if (items.Count == 0)
             return;
 
         var dest = await PickFolderAsync();
@@ -1566,9 +1608,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            var target = UniquePath(Path.Combine(dest, item.Name));
-            File.Move(item.Path, target);
-            StatusMessage = $"Moved to {Path.GetFileName(target)}";
+            foreach (var item in items)
+            {
+                var target = UniquePath(Path.Combine(dest, item.Name));
+                File.Move(item.Path, target);
+            }
+            SelectedGalleryItems.Clear();
+            StatusMessage = items.Count == 1 ? $"Moved to {Path.GetFileName(dest)}" : $"Moved {items.Count} items";
             RefreshGallery();
         }
         catch (Exception ex)

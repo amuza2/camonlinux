@@ -33,6 +33,21 @@ public partial class MainWindow : Window
             vm.OpenSelectedCommand.Execute(null);
     }
 
+    /// <summary>Keeps the VM's multi-selection collection in sync with the list box.</summary>
+    private void OnGallerySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || sender is not ListBox listBox)
+            return;
+        if (listBox.SelectedItems is not { } selected)
+            return;
+        vm.SelectedGalleryItems.Clear();
+        foreach (var item in selected)
+        {
+            if (item is camonlinux.Models.MediaItem media)
+                vm.SelectedGalleryItems.Add(media);
+        }
+    }
+
     /// <summary>Mouse wheel over the preview adjusts the digital zoom.</summary>
     private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
     {
