@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metainfo.
+
+  The filename must match the component <id> (or validation tools and app stores
+  cannot pair the two), and the <id> must be a reverse-DNS identifier — the old
+  bare "camonlinux.desktop" form is rejected by appstreamcli and blocks
+  appimagetool's AppStream validation step.
+-->
 <component type="desktop-application">
-  <id>camonlinux.desktop</id>
+  <id>io.github.amuza2.camonlinux</id>
   <name>camonlinux</name>
   <summary>Take photos and record videos with your webcam</summary>
   <metadata_license>MIT</metadata_license>
@@ -17,12 +25,16 @@
       <li>Videos (H.264 + AAC, MKV) with mic audio, rotation, digital zoom and auto-split</li>
       <li>Live camera controls — brightness, white balance, exposure, focus, gain, sharpness</li>
       <li>Gallery with thumbnails, an in-app photo viewer, and batch operations</li>
+      <li>Virtual webcam output via v4l2loopback, with optional background masking</li>
       <li>Device hot-plug detection, keyboard shortcuts, fullscreen</li>
     </ul>
   </description>
   <launchable type="desktop-id">camonlinux.desktop</launchable>
   <url type="homepage">https://github.com/amuza2/camonlinux</url>
   <url type="bugtracker">https://github.com/amuza2/camonlinux/issues</url>
+  <developer id="io.github.amuza2">
+    <name>amuza2</name>
+  </developer>
   <provides>
     <binary>camonlinux</binary>
   </provides>

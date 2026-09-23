@@ -89,31 +89,85 @@ dotnet test
 CI (`.github/workflows/build.yml`) runs the build with `-warnaserror`, the test suite
 and a publish, on every push and pull request.
 
-## Publish a release binary
+## Download / install a release
+
+Tagged releases ship two things, both self-contained (no `dotnet-runtime` needed):
+
+| Artifact | Use |
+|---|---|
+| `camonlinux-<version>-x86_64.AppImage` | Single file, run it directly |
+| `camonlinux-<version>-linux-x64.tar.gz` | `./install.sh` adds a launcher and icons |
 
 ```bash
-# Framework-dependent (smaller; needs the .NET runtime installed)
-dotnet publish camonlinux -c Release
+# AppImage
+chmod +x camonlinux-*-x86_64.AppImage
+./camonlinux-*-x86_64.AppImage
 
-# Self-contained (portable single-folder app, no runtime needed)
-dotnet publish camonlinux -c Release -r linux-x64 --self-contained true
+# Tarball
+tar -xzf camonlinux-*-linux-x64.tar.gz
+cd camonlinux-*-linux-x64
+./install.sh                       # ~/.local (per-user)
+./install.sh --prefix /usr/local   # system-wide
+./install.sh --uninstall           # remove it again
 ```
 
-## Install into the app menu
+Both bundle the .NET runtime, neither bundles GStreamer — deliberately, because the app has
+to use *your* camera (v4l2), audio server (PipeWire/Pulse) and desktop session (`xdg-open`,
+`notify-send`). Ship a second copy of those inside the bundle and you get "no camera found"
+reports that only reproduce on other people's machines, because the bundled copy cannot see
+the host's devices or sockets. Install the runtime dependencies instead:
+
+| Distribution | Packages |
+|---|---|
+| Arch | `gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly v4l-utils` |
+| Debian/Ubuntu | `gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly v4l-utils` |
+| Fedora | `gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free v4l-utils` |
+
+`install.sh` checks for GStreamer and tells you what to install. Missing GStreamer is not
+fatal: the app starts and reports it in the UI rather than crashing.
+
+Optional extras: `frei0r-plugins` (extra effects), `libcanberra` (shutter sound),
+`libnotify` (desktop notifications), `v4l2loopback-dkms` (virtual webcam).
+
+## Build a release yourself
 
 ```bash
-mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
-cp packaging/camonlinux.desktop ~/.local/share/applications/
-cp camonlinux/Assets/webcam.svg ~/.local/share/icons/hicolor/scalable/apps/camonlinux.svg
-# Copy or symlink your built binary into PATH, e.g.:
-#   ln -s "$PWD/camonlinux/bin/Release/net10.0/linux-x64/publish/camonlinux" ~/.local/bin/camonlinux
+./scripts/build-release.sh                      # binaries + AppImage, into artifacts/
+./scripts/build-release.sh --archs "linux-x64 linux-arm64"
+./scripts/build-release.sh --no-appimage        # skip the AppImage
+./scripts/build-release.sh --version 0.2.0      # override the version
 ```
+
+`--version` is compiled in, so the About window matches the artifact name. The version
+otherwise comes from the nearest git tag, falling back to `<Version>` in the csproj.
+
+The AppImage is built by `scripts/build-appimage.sh`, which downloads `appimagetool` on
+demand (most distributions do not package it) into `~/.cache/camonlinux` and checks it
+against the digest GitHub publishes for that asset. Pass `--appimagetool` to use your own.
+
+Notes on the publish flags, in case you change them:
+
+- **Trimming stays off.** Avalonia resolves views, styles and bindings by reflection, and a
+  trimmed build loses them *silently* — blank windows, not a build error.
+- **Single-file compresses the bundle** (~42 MB instead of ~110 MB). It is unpacked once
+  into `~/.cache/camonlinux/dotnet`, so only the first launch pays for it; `packaging/AppRun`
+  sets `DOTNET_BUNDLE_EXTRACT_BASE_DIR` so that survives a reboot.
+- **`DebugType=none`** keeps `.pdb` files out of user-facing artifacts; source and tag are
+  on GitHub.
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds both artifacts, checks
+that they start, and attaches them (with `.sha256` files) to a GitHub release.
+
+The metadata in `packaging/` — desktop file, AppStream metainfo, icon ladder — is asserted by
+`camonlinux.Tests/PackagingMetadataTests.cs`. Those are the things that fail *silently* for
+users (a blank launcher icon, an app that never shows up in a software centre, an AppImage
+that refuses to build), so they are tested like code.
 
 ## Project structure
 
 ```
 camonlinux/
-├── Models/                # CameraDevice, MediaItem, AppSettings
+├── Models/                # CameraDevice, MediaItem, AppSettings, MenuChoice/MenuText
 ├── Services/              # Settings, MediaLibrary (watcher), Trash, Notifications, VirtualCamera
 ├── Capture/               # ICaptureService + GStreamerCaptureService, CameraFrame, IFrameProcessor
 ├── Controls/              # VideoSurface (WriteableBitmap renderer)
@@ -121,9 +175,11 @@ camonlinux/
 ├── Masking/               # MaskPipeline + MaskFrameProcessor, Effects/, Geometry/, Svg/
 ├── ViewModels/            # MainWindowViewModel (CommunityToolkit MVVM), MaskEditorViewModel
 ├── Views/                 # MainWindow.axaml (FluentAvalonia UI) + dialogs
-└── Assets/                # app icon
+└── Assets/                # app icon (embedded into the binary as a resource)
 
 camonlinux.Tests/          # xUnit tests for the pure logic (no camera/GStreamer needed)
+packaging/                 # desktop file, AppStream metainfo, AppRun, icons/, PKGBUILD
+scripts/                   # build-release.sh, build-appimage.sh, install.sh
 ```
 
 ## How the capture pipeline works
@@ -161,6 +217,7 @@ v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
 - [x] Countdown self-timer (3 s / 10 s before a photo)
 - [x] Rotation (90°/180°/270°) + digital zoom (up to 4×)
 - [x] AppStream metainfo + AUR PKGBUILD
+- [x] Self-contained release builds — AppImage + tarball, built by CI on a `v*` tag
 - [ ] i18n
 
 ## Troubleshooting

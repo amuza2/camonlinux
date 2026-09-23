@@ -1,0 +1,33 @@
+#!/bin/sh
+# AppRun — the entry point of the camonlinux AppImage.
+#
+# POSIX sh on purpose: the AppImage runtime executes this with /bin/sh, and on
+# minimal systems that is dash, not bash.
+set -eu
+
+# The AppImage runtime exports APPDIR. Fall back to this script's own location so
+# the same file also works from an extracted AppDir (--appimage-extract, or
+# --appimage-extract-and-run in environments without FUSE, e.g. most CI runners).
+if [ -z "${APPDIR:-}" ]; then
+    APPDIR="$(dirname "$(readlink -f "$0")")"
+fi
+export APPDIR
+
+# A self-contained .NET single-file bundle unpacks its native libraries on first
+# run. The default location is under /tmp, which some systems mount small or wipe
+# on reboot; point it at a per-user cache so repeat launches stay fast.
+: "${XDG_CACHE_HOME:=$HOME/.cache}"
+DOTNET_BUNDLE_EXTRACT_BASE_DIR="$XDG_CACHE_HOME/camonlinux/dotnet"
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR
+mkdir -p "$DOTNET_BUNDLE_EXTRACT_BASE_DIR" 2>/dev/null || true
+
+# Make the bundled desktop file, icon and metainfo visible to the desktop portal
+# while the app is running (that is what lets notifications show the app icon).
+export XDG_DATA_DIRS="$APPDIR/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+
+# Empty today — the AppImage deliberately ships no bundled GStreamer (see the
+# comment in scripts/build-release.sh) — but keep the search path wired up so
+# that drop-in libraries in usr/lib are picked up if that ever changes.
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+exec "$APPDIR/usr/bin/camonlinux" "$@"

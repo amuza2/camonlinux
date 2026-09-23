@@ -1,0 +1,126 @@
+name: release
+
+# Builds the distributables and attaches them to a GitHub release.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Tagging is the only way to produce a release: the scripts take the version from
+# the tag, so a release can never advertise a version that was never tagged.
+on:
+  push:
+    tags: [ 'v*' ]
+  # Lets a tag be re-built from the Actions tab if a job needed re-running.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release
+        required: true
+
+permissions:
+  contents: write   # required to create the release and upload assets
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          # scripts/build-release.sh reads the nearest tag to name the artifacts
+          # and to build the unreleased-revision warning, which needs the tags.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test
+        run: |
+          dotnet restore camonlinux.sln
+          dotnet build camonlinux.sln -c Release --no-restore -warnaserror
+          dotnet test camonlinux.sln -c Release --no-build
+
+      # The metadata in packaging/ is what a distro sees; failing here is much
+      # cheaper than failing inside appimagetool after a 10 minute publish.
+      - name: Validate packaging metadata
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq appstream desktop-file-utils
+          appstreamcli validate --no-net packaging/*.metainfo.xml
+          desktop-file-validate packaging/camonlinux.desktop
+
+      - name: Build release
+        run: ./scripts/build-release.sh
+
+      - name: Verify the artifacts start
+        # A publish that produces a file which crashes on startup is the failure
+        # mode this catches; it cannot be seen by any unit test.
+        #
+        # GStreamer is deliberately NOT installed here, so this also exercises the
+        # "GStreamer is not available" path, which must be a message in the app
+        # rather than an unhandled exception. The X/GL libraries are needed for
+        # Avalonia to get as far as opening a window under Xvfb.
+        run: |
+          set -eu
+          sudo apt-get install -y -qq xvfb libx11-6 libice6 libsm6 libxrandr2 \
+            libxi6 libxcursor1 libxext6 libgl1 libegl1 libfontconfig1
+          APPIMAGE=$(ls artifacts/*.AppImage)
+          xvfb-run -a timeout 30 "$APPIMAGE" --appimage-extract-and-run > /tmp/appimage.log 2>&1 || true
+          xvfb-run -a timeout 30 ./artifacts/camonlinux-*-linux-x64/camonlinux > /tmp/binary.log 2>&1 || true
+          echo "--- AppImage ---"; cat /tmp/appimage.log
+          echo "--- binary ---"; cat /tmp/binary.log
+          if grep -qiE 'unhandled exception|System\.(DllNotFound|TypeLoad|MissingMethod)' \
+               /tmp/appimage.log /tmp/binary.log; then
+            echo "::error::the released artifact threw on startup"
+            exit 1
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## Install
+
+            Grab the **AppImage** and run it — no .NET runtime needed:
+
+            ```sh
+            chmod +x camonlinux-*-x86_64.AppImage
+            ./camonlinux-*-x86_64.AppImage
+            ```
+
+            Or install the tarball for your user (adds a launcher and icon):
+
+            ```sh
+            tar -xzf camonlinux-*-linux-x64.tar.gz
+            cd camonlinux-*-linux-x64
+            ./install.sh            # --prefix /usr/local for a system-wide install
+            ```
+
+            ## Requirements
+
+            GStreamer is **not** bundled, on purpose: the app uses the host's camera
+            (v4l2), audio server and desktop session. Install it first, e.g.
+
+            | Distribution | Packages |
+            |---|---|
+            | Arch | `gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly v4l-utils` |
+            | Debian/Ubuntu | `gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly v4l-utils` |
+            | Fedora | `gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free v4l-utils` |
+
+            Missing GStreamer is detected on start and reported in the app rather than
+            crashing, but the camera needs it.
+
+            Each artifact has a `.sha256` beside it.
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.tar.gz.sha256
+            artifacts/*.AppImage
+            artifacts/*.AppImage.sha256

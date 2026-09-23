@@ -37,5 +37,5 @@ package() {
   # The scalable master (camonlinux/Assets/webcam.svg) is the single source of truth
   # for the icon; the .ico in the same folder is only for the app window itself.
   install -Dm644 "$pkgname/camonlinux/Assets/webcam.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/camonlinux.svg"
-  install -Dm644 "$pkgname/packaging/camonlinux.appdata.xml" "$pkgdir/usr/share/metainfo/camonlinux.appdata.xml"
+  install -Dm644 "$pkgname/packaging/io.github.amuza2.camonlinux.metainfo.xml" "$pkgdir/usr/share/metainfo/io.github.amuza2.camonlinux.metainfo.xml"
 }

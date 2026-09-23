@@ -7,3 +7,6 @@ riderModule.iml
 *.user
 # throwaway test harnesses
 .captest*/
+# release output (scripts/build-release.sh) — tens of MB, uploaded to GitHub
+# releases rather than committed
+/artifacts/

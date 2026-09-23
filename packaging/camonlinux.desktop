@@ -6,6 +6,9 @@ Comment=Take photos and record videos with your webcam
 Exec=camonlinux
 Icon=camonlinux
 Terminal=false
-Categories=AudioVideo;AudioVideoEditing;Graphics;
+# Exactly one main category is allowed. AudioVideo is the main one and
+# AudioVideoEditing a sub-category of it; also listing Graphics made the entry
+# show up twice in some application menus, and appimagetool warned about it.
+Categories=AudioVideo;AudioVideoEditing;
 StartupNotify=true
 Keywords=webcam;camera;photo;video;record;
