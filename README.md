@@ -100,7 +100,7 @@ dotnet publish camonlinux -c Release -r linux-x64 --self-contained true
 ```bash
 mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
 cp packaging/camonlinux.desktop ~/.local/share/applications/
-cp packaging/camonlinux.svg ~/.local/share/icons/hicolor/scalable/apps/camonlinux.svg
+cp camonlinux/Assets/webcam.svg ~/.local/share/icons/hicolor/scalable/apps/camonlinux.svg
 # Copy or symlink your built binary into PATH, e.g.:
 #   ln -s "$PWD/camonlinux/bin/Release/net10.0/linux-x64/publish/camonlinux" ~/.local/bin/camonlinux
 ```

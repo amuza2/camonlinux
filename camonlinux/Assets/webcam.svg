@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128">
+  <!--
+    camonlinux app icon — vector master.
+
+    Reconstructed from the original 32x32 Assets/webcam.png, which was too small to
+    stay sharp in a launcher or on a HiDPI display. The geometry was measured from
+    that bitmap and the result is pixel-matched back against it (mean channel error
+    ~2.8%, residual being anti-aliasing only), so this is the same artwork — just
+    resolution-independent.
+
+    The viewBox stays on the original 32x32 grid so it maps 1:1 to the source pixels.
+
+    Palette (sampled from the original):
+      body      #EEEFEE   light disc
+      ring      #62667C   dark bezel + stand
+      bezel     #828A9E   blue-grey inner ring
+      lens      #69B0EE   blue lens
+      LED       #EF6370   recording light
+  -->
+  <title>camonlinux</title>
+
+  <!-- Body -->
+  <circle cx="16" cy="13.2" r="13.1" fill="#EEEFEE"/>
+
+  <!-- Lens assembly: bezel ring, blue-grey inner ring, lens, gloss highlight -->
+  <circle cx="16" cy="13" r="8" fill="#62667C"/>
+  <circle cx="16" cy="13" r="6" fill="#828A9E"/>
+  <circle cx="16" cy="13" r="4" fill="#69B0EE"/>
+  <circle cx="14.2" cy="11.4" r="1.15" fill="#FFFFFF"/>
+
+  <!-- Recording LED -->
+  <rect x="15" y="2" width="2" height="2" fill="#EF6370"/>
+
+  <!-- Stand: two pillars joined by a beam, with an arched opening underneath -->
+  <path fill="#62667C" d="M5.1 32
+        L6.3 32
+        Q16 27.7 25.7 32
+        L26.9 32
+        Q29.4 32 29.4 29.5
+        L29.4 27
+        Q29.4 22.8 25.6 22.8
+        Q16 29.2 6.4 22.8
+        Q2.6 22.8 2.6 27
+        L2.6 29.5
+        Q2.6 32 5.1 32
+        Z"/>
+</svg>

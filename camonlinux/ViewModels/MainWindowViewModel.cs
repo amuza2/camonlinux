@@ -85,7 +85,10 @@ public partial class MainWindowViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(ToggleBurstCommand))]
     private bool _isPreviewActive;
 
-    [ObservableProperty] private bool _isRecording;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RecordButtonText))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
+    private bool _isRecording;
 
     /// <summary>The Record button label: "Stop" while recording, "Record" otherwise.</summary>
     public string RecordButtonText => IsRecording ? "Stop" : "Record";

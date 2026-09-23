@@ -16,7 +16,7 @@
         <!-- App icon for every window (the main window also sets it explicitly in
              MainWindow.axaml, since that is the one the taskbar shows). -->
         <Style Selector="Window">
-            <Setter Property="Icon" Value="/Assets/webcam.png" />
+            <Setter Property="Icon" Value="/Assets/webcam.ico" />
         </Style>
     </Application.Styles>
 </Application>
