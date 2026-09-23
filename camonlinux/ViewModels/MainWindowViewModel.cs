@@ -83,6 +83,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleBurstCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowStatusMessage))]
     private bool _isPreviewActive;
 
     [ObservableProperty]
@@ -93,8 +94,20 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>The Record button label: "Stop" while recording, "Record" otherwise.</summary>
     public string RecordButtonText => IsRecording ? "Stop" : "Record";
 
-    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStatusMessage))]
+    private bool _isBusy;
+
     [ObservableProperty] private string _statusMessage = "Ready";
+
+    /// <summary>
+    /// Whether the status text should be shown in the preview area. The busy overlay and
+    /// the status message are both centred in the same spot, so showing them together
+    /// paints two labels on top of each other — which is exactly what happened while the
+    /// app was starting up (both said "Looking for cameras…" and then diverged).
+    /// </summary>
+    public bool ShowStatusMessage => !IsPreviewActive && !IsBusy;
+
     [ObservableProperty] private string _recordingTime = "00:00";
 
     [ObservableProperty]

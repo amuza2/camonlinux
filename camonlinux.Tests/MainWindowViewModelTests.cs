@@ -326,6 +326,50 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     // ------------------------------------------------------------------ //
+    // Preview-area overlays
+    // ------------------------------------------------------------------ //
+
+    [Fact]
+    public void ShowStatusMessage_IsNeverTrueWhileTheBusyOverlayIsVisible()
+    {
+        // Both are centred in the preview area, so showing them together paints two
+        // labels on top of each other. That happened while the app was starting up:
+        // IsBusy was true and IsPreviewActive was false, so both rendered at once.
+        var vm = CreateViewModel();
+
+        vm.IsBusy = true;
+        vm.IsPreviewActive = false;
+        Assert.False(vm.ShowStatusMessage);
+
+        vm.IsBusy = false;
+        Assert.True(vm.ShowStatusMessage);
+
+        // Preview running: the status text is no longer shown either way.
+        vm.IsPreviewActive = true;
+        Assert.False(vm.ShowStatusMessage);
+
+        vm.IsBusy = true;
+        Assert.False(vm.ShowStatusMessage);
+    }
+
+    [Fact]
+    public void ShowStatusMessage_TracksBothOfItsInputs()
+    {
+        // Without these notifications the status text would keep whatever visibility it
+        // had when the busy overlay appeared or the preview started.
+        var vm = CreateViewModel();
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.IsBusy = true;
+        Assert.Contains(nameof(MainWindowViewModel.ShowStatusMessage), changed);
+
+        changed.Clear();
+        vm.IsPreviewActive = true;
+        Assert.Contains(nameof(MainWindowViewModel.ShowStatusMessage), changed);
+    }
+
+    // ------------------------------------------------------------------ //
     // Camera control sliders
     // ------------------------------------------------------------------ //
 
