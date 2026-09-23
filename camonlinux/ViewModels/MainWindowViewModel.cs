@@ -358,6 +358,12 @@ public partial class MainWindowViewModel : ViewModelBase
         _exposureValue = settings.Settings.ExposureValue;
         _focusAuto = settings.Settings.FocusAuto;
         _focusValue = settings.Settings.FocusValue;
+        // Push the persisted state to the capture backend. Everything the VM restores
+        // from settings must be listed here too, otherwise the UI shows the saved value
+        // while the backend keeps its own default — and the first click on that control
+        // appears to do nothing (it just re-applies a value the backend already had).
+        _capture.Mirrored = _mirrored;
+        _capture.MicMuted = !_micEnabled;
         _capture.Rotation = settings.Settings.Rotation;
         _capture.Zoom = settings.Settings.Zoom;
         _capture.PhotoFormat = settings.Settings.PhotoFormat;

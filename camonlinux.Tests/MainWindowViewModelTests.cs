@@ -223,6 +223,109 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     // ------------------------------------------------------------------ //
+    // Startup settings must reach the capture backend
+    // ------------------------------------------------------------------ //
+
+    [Fact]
+    public void Mirrored_IsPushedToTheCaptureServiceOnStartup()
+    {
+        // The Mirror toggle was the visible symptom: the view model restored Mirrored
+        // from settings but never pushed it to the capture service. The service kept its
+        // own default (true), so the preview stayed mirrored while the toggle showed
+        // "off" — and the first click re-applied true, changing nothing.
+        _settings.Settings.Mirrored = false;
+
+        var vm = CreateViewModel();
+
+        Assert.False(vm.Mirrored);
+        Assert.False(_capture.Mirrored);
+    }
+
+    [Fact]
+    public void MicEnabled_IsPushedToTheCaptureServiceOnStartup()
+    {
+        // Same omission as Mirrored: MicMuted was only ever assigned from the toggle.
+        _settings.Settings.MicEnabled = false;
+
+        _ = CreateViewModel();
+
+        Assert.True(_capture.MicMuted);
+    }
+
+    [Fact]
+    public void TogglingMirror_UpdatesTheCaptureServiceBothWays()
+    {
+        var vm = CreateViewModel();
+
+        vm.Mirrored = false;
+        Assert.False(_capture.Mirrored);
+
+        vm.Mirrored = true;
+        Assert.True(_capture.Mirrored);
+    }
+
+    [Fact]
+    public void Constructor_PushesEveryRestoredSettingToTheCaptureService()
+    {
+        // Exhaustive guard for the whole class of bug above: every persisted setting the
+        // view model restores has to be handed to the backend at construction, or the UI
+        // and the camera silently disagree until that control is touched.
+        var s = _settings.Settings;
+        s.Mirrored = false;
+        s.MicEnabled = false;
+        s.Rotation = "180";
+        s.Zoom = 2;
+        s.PhotoFormat = "png";
+        s.ShowTimestamp = true;
+        s.Brightness = 10;
+        s.Contrast = 20;
+        s.Saturation = 30;
+        s.Sharpness = 40;
+        s.Gain = 50;
+        s.BacklightCompensation = 1;
+        s.WhiteBalanceAuto = false;
+        s.WhiteBalanceTemperature = 5000;
+        s.ExposureAuto = false;
+        s.ExposureValue = 300;
+        s.FocusAuto = false;
+        s.FocusValue = 77;
+        s.AudioDevice = "alsa_input.usb";
+        s.Resolution = "640×480 @ 30";
+        s.RecordQuality = "high";
+        s.MaxFileSizeMB = 1024;
+        s.VirtualCamBackground = "Green";
+
+        _ = CreateViewModel();
+
+        Assert.False(_capture.Mirrored);
+        Assert.True(_capture.MicMuted);
+        Assert.Equal("180", _capture.Rotation);
+        Assert.Equal(2d, _capture.Zoom);
+        Assert.Equal("png", _capture.PhotoFormat);
+        Assert.True(_capture.ShowTimestamp);
+        Assert.Equal(10, _capture.Brightness);
+        Assert.Equal(20, _capture.Contrast);
+        Assert.Equal(30, _capture.Saturation);
+        Assert.Equal(40, _capture.Sharpness);
+        Assert.Equal(50, _capture.Gain);
+        Assert.Equal(1, _capture.BacklightCompensation);
+        Assert.False(_capture.WhiteBalanceAuto);
+        Assert.Equal(5000, _capture.WhiteBalanceTemperature);
+        Assert.False(_capture.ExposureAuto);
+        Assert.Equal(300, _capture.ExposureValue);
+        Assert.False(_capture.FocusAuto);
+        Assert.Equal(77, _capture.FocusValue);
+        Assert.Equal("alsa_input.usb", _capture.AudioDevice);
+        Assert.Equal("640×480 @ 30", _capture.Resolution);
+        Assert.Equal("high", _capture.RecordQuality);
+        Assert.Equal(1024L, _capture.MaxFileSizeMB);
+        // "Green" is the mask background, shared with the virtual webcam.
+        Assert.Equal((byte)0, _capture.MaskBackground.R);
+        Assert.Equal((byte)255, _capture.MaskBackground.G);
+        Assert.Equal((byte)0, _capture.MaskBackground.B);
+    }
+
+    // ------------------------------------------------------------------ //
     // Gallery thumbnails track the panel width
     // ------------------------------------------------------------------ //
 

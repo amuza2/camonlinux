@@ -209,11 +209,6 @@
                 <StackPanel DockPanel.Dock="Bottom" Margin="8" Spacing="6"
                             IsVisible="{Binding !ShowEffectsPanel}">
                     <Button Content="Play video" Command="{Binding PlaySelectedCommand}"/>
-                    <Button Content="Rename" Command="{Binding RenameSelectedCommand}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Button Content="Copy" Command="{Binding CopySelectedCommand}" HorizontalAlignment="Stretch"/>
-                        <Button Content="Move" Command="{Binding MoveSelectedCommand}" HorizontalAlignment="Stretch"/>
-                    </StackPanel>
                     <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"/>
                 </StackPanel>
 
@@ -384,7 +379,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Max size" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
                         <ComboBox ItemsSource="{Binding MaxSizeOptions}" SelectedItem="{Binding SelectedMaxSize}"
-                                  Width="96" VerticalAlignment="Center"/>
+                                  Width="132" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>

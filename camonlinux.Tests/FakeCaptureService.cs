@@ -19,7 +19,12 @@ internal sealed class FakeCaptureService : ICaptureService
     public IFrameProcessor? FrameProcessor { get; set; }
     public bool IsPreviewActive { get; set; }
     public bool IsRecording { get; set; }
-    public bool Mirrored { get; set; }
+
+    // NOTE: these defaults deliberately mirror GStreamerCaptureService exactly. If the
+    // double defaults differ, a test asserting "the view model pushed X at startup"
+    // passes whenever X happens to equal the double's default — i.e. it silently stops
+    // testing anything. (This is how the Mirror bug slipped past the first draft.)
+    public bool Mirrored { get; set; } = true;
     public bool MicMuted { get; set; }
     public string Resolution { get; set; } = "";
     public string RecordQuality { get; set; } = "medium";
@@ -29,17 +34,17 @@ internal sealed class FakeCaptureService : ICaptureService
     public string PhotoFormat { get; set; } = "jpeg";
     public bool ShowTimestamp { get; set; }
     public (byte R, byte G, byte B) MaskBackground { get; set; }
-    public int Brightness { get; set; }
-    public int Contrast { get; set; }
-    public int Saturation { get; set; }
-    public int Sharpness { get; set; }
+    public int Brightness { get; set; } = 128;
+    public int Contrast { get; set; } = 128;
+    public int Saturation { get; set; } = 128;
+    public int Sharpness { get; set; } = 128;
     public int Gain { get; set; }
     public int BacklightCompensation { get; set; }
-    public bool WhiteBalanceAuto { get; set; }
-    public int WhiteBalanceTemperature { get; set; }
-    public bool ExposureAuto { get; set; }
-    public int ExposureValue { get; set; }
-    public bool FocusAuto { get; set; }
+    public bool WhiteBalanceAuto { get; set; } = true;
+    public int WhiteBalanceTemperature { get; set; } = 4000;
+    public bool ExposureAuto { get; set; } = true;
+    public int ExposureValue { get; set; } = 250;
+    public bool FocusAuto { get; set; } = true;
     public int FocusValue { get; set; }
     public string AudioDevice { get; set; } = "";
     public string Effect { get; set; } = "";
