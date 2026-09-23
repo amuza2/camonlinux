@@ -18,5 +18,11 @@
         <Style Selector="Window">
             <Setter Property="Icon" Value="/Assets/webcam.ico" />
         </Style>
+
+        <!-- Right-panel resize grip: invisible until hovered, so it reads as an edge
+             you can grab without adding a permanent line to the layout. -->
+        <Style Selector="Border.resize-grip:pointerover">
+            <Setter Property="Background" Value="#33FFFFFF" />
+        </Style>
     </Application.Styles>
 </Application>

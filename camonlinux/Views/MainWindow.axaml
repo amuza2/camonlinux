@@ -13,7 +13,8 @@
         Width="960" Height="600"
         MinWidth="640" MinHeight="480"
         WindowState="Maximized"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        SizeChanged="OnWindowSizeChanged">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Space" Command="{Binding TakePhotoCommand}"/>
@@ -162,8 +163,24 @@
             </StackPanel>
         </Border>
 
-        <!-- Right panel: captures / effects -->
-        <Border DockPanel.Dock="Right" Width="240" Background="#202020">
+        <!-- Right panel: captures / effects. Drag its left edge to resize it. -->
+        <Border DockPanel.Dock="Right" Width="{Binding RightPanelWidth}" Background="#202020">
+            <DockPanel>
+            <!-- Resize grip. The panel is docked to the right, so dragging the grip
+                 left widens it and dragging right narrows it; double-clicking
+                 restores the default width.
+
+                 Deliberately a plain Border and not a Thumb: Thumb calls
+                 PointerPressedEventArgs.PreventGestureRecognition(), so a native
+                 DoubleTapped would never reach it. -->
+            <Border DockPanel.Dock="Left" Width="6" Cursor="SizeWestEast"
+                    Classes="resize-grip" Background="Transparent"
+                    PointerPressed="OnPanelResizeGripPressed"
+                    PointerMoved="OnPanelResizeGripMoved"
+                    PointerReleased="OnPanelResizeGripReleased"
+                    DoubleTapped="OnPanelResizeReset"
+                    ToolTip.Tip="Drag left or right to resize this panel — double-click to reset"/>
+
             <Grid>
             <DockPanel>
                 <Grid DockPanel.Dock="Top" Margin="8,10,8,6" ColumnDefinitions="*,*" ColumnSpacing="6">
@@ -200,24 +217,38 @@
                     <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"/>
                 </StackPanel>
 
-                <!-- Effects gallery -->
+                <!-- Effects gallery: always two columns, with the tiles growing as the
+                     panel is widened (rather than packing in more, smaller previews). -->
                 <ListBox ItemsSource="{Binding FilteredEffects}"
                          SelectedItem="{Binding SelectedEffect}"
                          IsVisible="{Binding ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.Styles>
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel/>
+                            <!-- Half the panel per tile, guaranteed. The ListBox's
+                                 ScrollViewer measures with unlimited height, so each cell
+                                 still sizes to its content instead of stretching down. -->
+                            <UniformGrid Columns="2"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:EffectOption">
                             <Border CornerRadius="4" Margin="3" Background="#40000000"
                                     BorderBrush="#33FFFFFF" BorderThickness="1">
-                                <StackPanel>
-                                    <Grid>
-                                        <Image Source="{Binding Thumbnail}" Width="100" Height="56"
-                                               Stretch="UniformToFill"/>
+                                <Grid RowDefinitions="Auto,Auto">
+                                    <Grid Grid.Row="0">
+                                        <!-- Stretch=Uniform (not UniformToFill): the image
+                                             takes the width the tile is given and derives
+                                             its height from the aspect ratio, so nothing
+                                             is cropped. MinHeight keeps a placeholder
+                                             while the preview is still rendering. -->
+                                        <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                               MinHeight="44" HorizontalAlignment="Stretch"/>
                                         <ToggleButton IsChecked="{Binding IsFavorite}" Content="★"
                                                       FontSize="11" Width="24" Height="20" Padding="0"
                                                       HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -236,9 +267,9 @@
                                             </ToggleButton.Styles>
                                         </ToggleButton>
                                     </Grid>
-                                    <TextBlock Text="{Binding Name}" HorizontalAlignment="Center"
+                                    <TextBlock Grid.Row="1" Text="{Binding Name}" HorizontalAlignment="Center"
                                                FontSize="12" Margin="0,2"/>
-                                </StackPanel>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -252,20 +283,38 @@
                          DoubleTapped="OnGalleryDoubleTapped"
                          IsVisible="{Binding !ShowEffectsPanel}"
                          Background="Transparent" Margin="4,0,4,8">
+                    <ListBox.Styles>
+                        <!-- Make each row span the panel, so the selection highlight and
+                             hit area cover the full width rather than just the content. -->
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:MediaItem">
-                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,3">
-                                <Border CornerRadius="3" ClipToBounds="True" Background="#40000000">
-                                    <Image Source="{Binding Thumbnail}" Width="64" Height="36"
+                            <!-- Auto/* columns: the thumbnail keeps the width the panel
+                                 affords and the text takes what is left, so dragging
+                                 the panel wider grows the previews and the file name
+                                 instead of leaving a strip of empty space. -->
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="4,3">
+                                <Border Grid.Column="0" CornerRadius="3" ClipToBounds="True"
+                                        Background="#40000000" VerticalAlignment="Center">
+                                    <!-- Width/Height follow the panel; the Min/Max pair both
+                                         caps the growth and keeps a usable size if the
+                                         size lookup ever fails to resolve. -->
+                                    <Image Source="{Binding Thumbnail}"
+                                           MinWidth="64" MinHeight="36" MaxWidth="160" MaxHeight="90"
+                                           Width="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).GalleryThumbWidth}"
+                                           Height="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).GalleryThumbHeight}"
                                            Stretch="UniformToFill"/>
                                 </Border>
-                                <StackPanel VerticalAlignment="Center" Spacing="1">
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                                     <TextBlock Text="{Binding Name}" FontSize="12"
-                                               TextTrimming="CharacterEllipsis" MaxWidth="140"/>
+                                               TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding ModifiedAt, StringFormat='{}{0:MMM d, HH:mm}'}"
                                                FontSize="10" Foreground="#A0A0A0"/>
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -275,6 +324,7 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="14"
                        IsVisible="{Binding ShowGalleryEmptyHint}"/>
             </Grid>
+            </DockPanel>
         </Border>
 
         <!-- Capture controls (Photo / Video tabs) -->

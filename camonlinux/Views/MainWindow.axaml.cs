@@ -239,6 +239,79 @@ public partial class MainWindow : Window
             vm.AdjustZoom(e.Delta.Y);
     }
 
+    // ------------------------------------------------------------------ //
+    // Right panel resize grip
+    // ------------------------------------------------------------------ //
+
+    private bool _resizingPanel;
+    private Point _resizePointerOrigin;
+    private double _resizeStartWidth;
+
+    /// <summary>
+    /// Starts dragging the right (captures / effects) panel's left edge. The panel is
+    /// docked to the right, so moving the pointer left makes it wider.
+    /// </summary>
+    private void OnPanelResizeGripPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control grip || DataContext is not MainWindowViewModel vm)
+            return;
+        if (!e.GetCurrentPoint(grip).Properties.IsLeftButtonPressed)
+            return;
+
+        _resizingPanel = true;
+        _resizePointerOrigin = e.GetPosition(this);
+        _resizeStartWidth = vm.RightPanelWidth;
+
+        // Capture so the drag keeps working once the pointer leaves the 6px grip.
+        e.Pointer.Capture(grip);
+        e.Handled = true;
+    }
+
+    /// <summary>Resizes the panel while the grip is dragged.</summary>
+    private void OnPanelResizeGripMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_resizingPanel || DataContext is not MainWindowViewModel vm)
+            return;
+
+        var movedLeft = _resizePointerOrigin.X - e.GetPosition(this).X;
+        vm.RightPanelWidth = MainWindowViewModel.PanelWidthForDrag(_resizeStartWidth, movedLeft, Bounds.Width);
+        e.Handled = true;
+    }
+
+    private void OnPanelResizeGripReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_resizingPanel)
+            return;
+
+        _resizingPanel = false;
+        e.Pointer.Capture(null);
+        e.Handled = true;
+    }
+
+    /// <summary>Double-clicking the grip restores the panel's default width.</summary>
+    private void OnPanelResizeReset(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+
+        vm.RightPanelWidth = MainWindowViewModel.DefaultPanelWidth;
+        e.Handled = true;
+    }
+
+    /// <summary>Shrinking the window must not let the panel eat the whole preview.</summary>
+    private void OnWindowSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || e.NewSize.Width <= 0)
+            return;
+
+        // The saved width is already clamped to the static range on load; this only
+        // handles the window becoming too small for it.
+        vm.RightPanelWidth = Math.Clamp(
+            vm.RightPanelWidth,
+            MainWindowViewModel.MinPanelWidth,
+            MainWindowViewModel.MaxPanelWidthForWindow(e.NewSize.Width));
+    }
+
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);

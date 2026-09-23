@@ -38,6 +38,10 @@ public sealed class AppSettings
     public bool IsMaximized { get; set; } = true;
     public double WinWidth { get; set; } = 960;
     public double WinHeight { get; set; } = 600;
+
+    /// <summary>Width of the right (captures / effects) panel, in pixels. Drag-resizable.</summary>
+    public double RightPanelWidth { get; set; } = 240;
+
     public string? LastDeviceId { get; set; }
 
     /// <summary>Background used for masked-out (transparent) areas of the virtual webcam.</summary>

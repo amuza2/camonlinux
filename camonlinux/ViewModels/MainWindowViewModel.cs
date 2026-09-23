@@ -227,6 +227,80 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private bool _isVirtualCamEnabled;
     [ObservableProperty] private string _virtualCamBackground = "Black";
 
+    /// <summary>Smallest width the right (captures / effects) panel can be dragged to.</summary>
+    public const double MinPanelWidth = 200;
+
+    /// <summary>Largest width the right panel can be dragged to, so the preview always keeps room.</summary>
+    public const double MaxPanelWidth = 640;
+
+    /// <summary>Width the panel starts at, and resets to when the grip is double-clicked.</summary>
+    public const double DefaultPanelWidth = 240;
+
+    /// <summary>Preview width (px) the right panel may never squeeze out of existence.</summary>
+    public const double MinPreviewWidth = 300;
+
+    /// <summary>
+    /// Size the gallery thumbnails are rendered at — big enough to stay crisp in the
+    /// widest panel, so widening the panel scales them up instead of blurring them.
+    /// </summary>
+    private const int GalleryThumbRenderWidth = 160;
+    private const int GalleryThumbRenderHeight = 90;
+
+    /// <summary>Fraction of the panel width a capture thumbnail occupies.</summary>
+    private const double GalleryThumbScale = 0.28;
+
+    /// <summary>Smallest capture-thumbnail width, matching the original fixed layout.</summary>
+    private const double GalleryThumbMinWidth = 64;
+
+    /// <summary>
+    /// Render size for the effect previews. The effects gallery shows two columns, so a
+    /// tile is half the panel wide — this covers the widest panel, letting the preview
+    /// grow with the panel instead of being a 100x56 image scaled up and blurred.
+    /// </summary>
+    private const int EffectThumbRenderWidth = 320;
+    private const int EffectThumbRenderHeight = 180;
+
+    /// <summary>
+    /// Width of the right panel in pixels. Bound to the panel's Width and driven by the
+    /// resize grip in <c>MainWindow.axaml</c>; persisted so the layout survives a restart.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GalleryThumbWidth))]
+    [NotifyPropertyChangedFor(nameof(GalleryThumbHeight))]
+    private double _rightPanelWidth = DefaultPanelWidth;
+
+    /// <summary>
+    /// Capture-thumbnail width for the current panel width. The gallery rows scale with
+    /// the panel, so dragging it wider shows bigger previews rather than empty space.
+    /// </summary>
+    public double GalleryThumbWidth => Math.Round(Math.Clamp(
+        RightPanelWidth * GalleryThumbScale, GalleryThumbMinWidth, GalleryThumbRenderWidth));
+
+    /// <summary>Height matching <see cref="GalleryThumbWidth"/> at the rendered aspect ratio.</summary>
+    public double GalleryThumbHeight
+        => Math.Round(GalleryThumbWidth * GalleryThumbRenderHeight / GalleryThumbRenderWidth);
+
+    /// <summary>Clamps a requested panel width to the allowed range (and rejects NaN/infinity).</summary>
+    public static double ClampPanelWidth(double width)
+        => double.IsFinite(width) ? Math.Clamp(width, MinPanelWidth, MaxPanelWidth) : MinPanelWidth;
+
+    /// <summary>
+    /// Upper bound for the panel width on a window of the given width: the hard cap,
+    /// further limited so the preview keeps at least <see cref="MinPreviewWidth"/> pixels.
+    /// </summary>
+    public static double MaxPanelWidthForWindow(double windowWidth)
+        => Math.Max(
+            MinPanelWidth,
+            Math.Min(MaxPanelWidth, windowWidth - MinPreviewWidth));
+
+    /// <summary>
+    /// The panel width resulting from dragging the grip <paramref name="movedLeft"/> pixels
+    /// from <paramref name="startWidth"/>. The panel is docked to the right, so moving the
+    /// pointer left (a positive value) makes it wider and moving right makes it narrower.
+    /// </summary>
+    public static double PanelWidthForDrag(double startWidth, double movedLeft, double windowWidth)
+        => Math.Clamp(startWidth + movedLeft, MinPanelWidth, MaxPanelWidthForWindow(windowWidth));
+
     public MainWindowViewModel(
         ICaptureService capture,
         SettingsService settings,
@@ -264,6 +338,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _virtualCamBackground = string.IsNullOrEmpty(settings.Settings.VirtualCamBackground)
             ? "Black"
             : settings.Settings.VirtualCamBackground;
+        // Assign the field, not the property, so restoring a saved width doesn't write
+        // it straight back to disk on startup.
+        _rightPanelWidth = ClampPanelWidth(settings.Settings.RightPanelWidth);
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
@@ -706,6 +783,13 @@ public partial class MainWindowViewModel : ViewModelBase
         _capture.MaskBackground = BackgroundColor.Parse(value);
     }
 
+    partial void OnRightPanelWidthChanged(double value)
+    {
+        _settings.Settings.RightPanelWidth = value;
+        // Dragging the grip fires this continuously — coalesce the disk writes.
+        _settings.QueueSave();
+    }
+
     private static string MapBurstIntervalLabel(double seconds) => seconds switch
     {
         <= 1.2 => "1 s",
@@ -977,7 +1061,8 @@ public partial class MainWindowViewModel : ViewModelBase
             var output = Path.Combine(thumbDir, $"{effect.Id}.png");
             var filter = BuildEffectFilter(effect, effect.IntensityDefault);
             var rendered = await Task.Run(() =>
-                _capture.RenderEffectThumbnailAsync(filter, _sampleImagePath!, output, 100, 56));
+                _capture.RenderEffectThumbnailAsync(
+                    filter, _sampleImagePath!, output, EffectThumbRenderWidth, EffectThumbRenderHeight));
 
             if (rendered is not null)
             {
@@ -1386,8 +1471,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (needsRender)
         {
             // Reuse the one-shot GStreamer thumbnail pipeline for photos AND videos.
+            // Rendered at the largest size the panel can display, so scaling up in the
+            // view is a downscale from the cache rather than a blurry upscale.
             var rendered = await Task.Run(() =>
-                _capture.RenderEffectThumbnailAsync("", item.Path, thumbPath, 100, 56) is not null);
+                _capture.RenderEffectThumbnailAsync(
+                    "", item.Path, thumbPath, GalleryThumbRenderWidth, GalleryThumbRenderHeight) is not null);
             if (!rendered)
                 return;
         }
@@ -1434,8 +1522,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         // SHA-256 (not SHA-1): the hash is only a cache key, but a weak algorithm is
         // flagged by the analyzers and there is no reason to keep it.
+        //
+        // The rendered size is part of the key so that changing it invalidates the old
+        // cache files instead of reusing thumbnails at the wrong resolution.
+        var key = $"{GalleryThumbRenderWidth}x{GalleryThumbRenderHeight}:{filePath}";
         var hash = Convert.ToHexString(
-            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)));
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)));
         return Path.Combine(Path.GetTempPath(), "camonlinux_gallery", hash + ".png");
     }
 
