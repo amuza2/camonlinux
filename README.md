@@ -1,12 +1,27 @@
+<div align="center">
+
+![camonlinux](packaging/icons/camonlinux-256.png)
+
 # camonlinux
 
-A simple, modern webcam app for Linux — take photos and record videos with your
-webcam. Built with **C# / .NET 10**, **Avalonia UI**, **CommunityToolkit.Mvvm**
-and **FluentAvalonia**, with a **GStreamer** capture backend.
+[![Build](https://github.com/amuza2/camonlinux/actions/workflows/build.yml/badge.svg)](https://github.com/amuza2/camonlinux/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/) [![Platform](https://img.shields.io/badge/Platform-Linux-orange)](https://www.linux.org/) [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi)](https://ko-fi.com/codingisamazing)
 
-Inspired by KDE's Kamoso, but written from scratch in C#.
+A simple, modern webcam app for Linux, built with Avalonia UI and a GStreamer capture
+backend. camonlinux takes photos and records videos with your webcam, with live effects,
+background masking and a virtual-camera output.
 
-## Features (MVP)
+Inspired by KDE's Kamoso, but written from scratch in **C# / .NET 10**.
+
+<!-- Screenshot: drag-and-drop your image into a GitHub comment or issue, copy the
+     resulting user-attachments URL into src below, then delete the comment markers.
+<img width="817" height="608" alt="camonlinux main window" src="https://github.com/user-attachments/assets/REPLACE-ME" />
+-->
+
+</div>
+
+## Features
 
 - Live webcam preview (GStreamer `v4l2src` → `appsink`, rendered on a `WriteableBitmap`)
 - Take photos (JPEG or PNG, saved to `~/Pictures`) with a **white screen flash** on capture
@@ -28,74 +43,43 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - **Status pills** for Mask and Virtual Webcam, so a mode that now lives in a menu (and a live virtual camera in particular) is still visible at a glance
 - **About window** (Help ▸ About) with version, links and a copyable diagnostics block
 - **Hideable right panel** (View ▸ Captures & Effects Panel)
+- **Background masking** — a mask editor with shape, gradient, SVG, chroma-key and
+  background-subtraction masks, feathering and per-mask colour adjustment, stacked in
+  layers. The result applies to the preview, the photos and the recordings
+- **Virtual webcam** — publishes the processed preview to a `v4l2loopback` device so any
+  other application (Zoom, OBS, a browser) can use it as a camera
 - **Audio device picker** — choose which mic to record (lists PipeWire/Pulse sources via `pactl`, monitors excluded)
-- **Keyboard shortcuts** — `Space` photo, `R` record, `B` burst, `M` mirror, `E` effects, `F11` fullscreen, `Ctrl+Q` quit. The same gestures are shown beside the matching menu entries; `Window.KeyBindings` is what actually runs them, so the two places must be kept in step
 - **Mouse-wheel zoom** over the preview, **live recording file size** beside the timer, **effect search box**, **toast notifications**, **delete confirmation**, **auto-refreshing gallery**, and the window **remembers its size/state**
 - **Single-instance guard** — a second launch notifies and exits instead of fighting over the camera
 - Desktop notifications (`notify-send`)
-- Settings persisted to `~/.config/camonlinux/settings.json`
 
-## Stack
+## Keyboard Shortcuts
 
-| Piece | Choice |
-|---|---|
-| Language / runtime | C# / .NET 10 (`net10.0`) |
-| UI framework | Avalonia 12.1.1 |
-| UI theme (no manual styling) | FluentAvalonia 3.0.2 (MIT) |
-| MVVM | CommunityToolkit.Mvvm 8.4 |
-| Capture backend | GStreamer via GirCore 0.8.1 (`GirCore.Gst-1.0` etc.) |
-| Photo encoding | SkiaSharp |
-| License | MIT |
+| Shortcut | Action |
+|----------|--------|
+| `Space` | Take a photo |
+| `R` | Start / stop recording |
+| `B` | Start / stop burst mode |
+| `M` | Mirror the camera image |
+| `E` | Switch the right panel between Captures and Effects |
+| `F11` | Fullscreen |
+| `Ctrl+Q` | Quit |
 
-## Requirements (EndeavourOS / Arch)
+Mouse wheel over the preview zooms, and double-clicking the right panel's resize grip
+resets its width.
 
-```bash
-# .NET SDK
-sudo pacman -S dotnet-sdk
+The same gestures are also shown beside their menu entries. `Window.KeyBindings` is what
+actually runs them, so a shortcut has to be changed in both places to stay in step.
 
-# GStreamer + plugins (video capture, H.264 encode, Matroska mux, effects)
-sudo pacman -S gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gstreamer-vaapi
+## Installation
 
-# Desktop notifications
-sudo pacman -S libnotify
+### Download a release
 
-# Optional: extra (frei0r) effects — cartoon, night vision, pixelate, …
-sudo pacman -S frei0r-plugins
-
-# Make sure your user can access the webcam (re-login after this!)
-sudo usermod -aG video $USER
-```
-
-## Build & run
-
-```bash
-cd camonlinux
-dotnet run --project camonlinux
-# or
-dotnet build
-./camonlinux/bin/Debug/net10.0/camonlinux
-```
-
-## Tests
-
-The unit tests cover the pure logic — the masking pipeline, the BGRA pixel helpers,
-GStreamer launch-string escaping, settings persistence and the trash implementation.
-They need no camera, no GStreamer and no display, so they run anywhere:
-
-```bash
-dotnet test
-```
-
-CI (`.github/workflows/build.yml`) runs the build with `-warnaserror`, the test suite
-and a publish, on every push and pull request.
-
-## Download / install a release
-
-Tagged releases ship two things, both self-contained (no `dotnet-runtime` needed):
+Tagged releases ship two self-contained artifacts — no `dotnet-runtime` needed:
 
 | Artifact | Use |
 |---|---|
-| `camonlinux-<version>-x86_64.AppImage` | Single file, run it directly |
+| `camonlinux-<version>-x86_64.AppImage` | Single file: make it executable and run it |
 | `camonlinux-<version>-linux-x64.tar.gz` | `./install.sh` adds a launcher and icons |
 
 ```bash
@@ -111,11 +95,14 @@ cd camonlinux-*-linux-x64
 ./install.sh --uninstall           # remove it again
 ```
 
-Both bundle the .NET runtime, neither bundles GStreamer — deliberately, because the app has
-to use *your* camera (v4l2), audio server (PipeWire/Pulse) and desktop session (`xdg-open`,
-`notify-send`). Ship a second copy of those inside the bundle and you get "no camera found"
-reports that only reproduce on other people's machines, because the bundled copy cannot see
-the host's devices or sockets. Install the runtime dependencies instead:
+Each artifact has a `.sha256` file beside it.
+
+### Prerequisites
+
+The .NET runtime is bundled; **GStreamer is not**, deliberately — the app has to use *your*
+camera (v4l2), audio server (PipeWire/Pulse) and desktop session (`xdg-open`, `notify-send`).
+A bundled copy cannot see the host's devices or sockets, so it would only produce "no camera
+found" reports on other people's machines.
 
 | Distribution | Packages |
 |---|---|
@@ -123,13 +110,90 @@ the host's devices or sockets. Install the runtime dependencies instead:
 | Debian/Ubuntu | `gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly v4l-utils` |
 | Fedora | `gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free v4l-utils` |
 
-`install.sh` checks for GStreamer and tells you what to install. Missing GStreamer is not
-fatal: the app starts and reports it in the UI rather than crashing.
+On Arch / EndeavourOS:
+
+```bash
+sudo pacman -S gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly v4l-utils
+sudo usermod -aG video $USER   # webcam access — log out and back in
+```
+
+`install.sh` checks for GStreamer and prints the package names above. Missing GStreamer is
+not fatal: the app starts and reports it in the UI rather than crashing.
 
 Optional extras: `frei0r-plugins` (extra effects), `libcanberra` (shutter sound),
 `libnotify` (desktop notifications), `v4l2loopback-dkms` (virtual webcam).
 
-## Build a release yourself
+### Build from source
+
+```bash
+git clone https://github.com/amuza2/camonlinux.git
+cd camonlinux
+
+dotnet run --project camonlinux
+# or
+dotnet build
+./camonlinux/bin/Debug/net10.0/camonlinux
+```
+
+### Tests
+
+The unit tests cover the pure logic — the masking pipeline, the BGRA pixel helpers,
+GStreamer launch-string escaping, settings persistence, the trash implementation and the
+packaging metadata. They need no camera, no GStreamer and no display, so they run anywhere:
+
+```bash
+dotnet test
+```
+
+CI (`.github/workflows/build.yml`) runs the build with `-warnaserror`, the test suite and a
+publish on every push and pull request.
+
+## Usage
+
+1. **Pick a camera** — the toolbar dropdown. The list refreshes itself as you plug devices
+   in and out.
+2. **Take a photo** — `Take Photo` (or `Space`). Choose JPEG or PNG and an optional 3 s / 10 s
+   self-timer first; the frame is saved to `~/Pictures`.
+3. **Record a video** — switch to the `Video` tab and press `Record` (or `R`). Pick a mic, a
+   quality and an optional size cap; the file lands in `~/Videos`.
+4. **Add effects** — open the `Effects` side of the right panel, search or star a favourite,
+   and it applies to the preview, photos and recordings at once.
+5. **Review** — the `Captures` side lists recent photos and videos with thumbnails. Play a
+   video in your system player, or delete it to the trash.
+6. **Go further** — `Tools ▸ Mask Editor` hides your background, and
+   `Tools ▸ Virtual Webcam` publishes the result to a `v4l2loopback` device for other apps.
+
+### Supported Formats
+
+- Photos: `.jpg`, `.png`
+- Video: `.mkv` (H.264 + AAC)
+
+## Configuration
+
+Settings are stored in `~/.config/camonlinux/settings.json`, and include:
+
+- Camera, resolution, rotation and digital zoom
+- Photo directory, video directory, photo format, record quality and size cap
+- Camera controls — brightness, contrast, saturation, sharpness, gain, backlight
+  compensation, white balance, exposure and focus
+- Microphone selection and mute state, mirroring, timestamp overlay, burst interval
+- Favourite effects and their saved intensities
+- Window geometry, plus the width and visibility of the right panel
+
+## Tech stack
+
+| Piece | Choice |
+|---|---|
+| Language / runtime | C# / .NET 10 (`net10.0`) |
+| UI framework | [Avalonia](https://avaloniaui.net/) 12.1.1 |
+| UI theme (no manual styling) | [FluentAvalonia](https://github.com/amwx/FluentAvalonia) 3.0.2 (MIT) |
+| MVVM | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) 8.4 |
+| Capture backend | GStreamer via [GirCore](https://github.com/gircore/gir.core) 0.8.1 (`GirCore.Gst-1.0` etc.) |
+| Photo encoding | [SkiaSharp](https://github.com/mono/SkiaSharp) |
+| System | GStreamer 1.20+, `v4l-utils`, a camera at `/dev/video*` |
+| License | MIT |
+
+## Releasing
 
 ```bash
 ./scripts/build-release.sh                      # binaries + AppImage, into artifacts/
@@ -235,4 +299,22 @@ v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome!
+
+1. **Open an issue** first to discuss the proposed change
+2. **Fork** the repository
+3. **Create a branch** for your feature or fix
+4. **Submit a Pull Request** referencing the issue
+
+## Acknowledgments
+
+- Icon by [Flaticon](https://www.flaticon.com/)
+- Inspired by [Kamoso](https://apps.kde.org/kamoso/)
+
+<div align="center">
+Made with ❤️ for the Linux community
+</div>
