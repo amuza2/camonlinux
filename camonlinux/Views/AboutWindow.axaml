@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="camonlinux.Views.AboutWindow"
+        Title="About camonlinux"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner">
+
+    <StackPanel Margin="20" Spacing="14">
+
+        <!-- Identity -->
+        <StackPanel Orientation="Horizontal" Spacing="14">
+            <Image Source="/Assets/webcam-128.png" Width="64" Height="64"
+                   VerticalAlignment="Top"/>
+            <StackPanel VerticalAlignment="Center" Spacing="3">
+                <TextBlock Text="camonlinux" FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock x:Name="VersionText" FontSize="13" Foreground="#B0B0B0"/>
+                <TextBlock Text="MIT licence" FontSize="12" Foreground="#909090"/>
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Text="A simple, modern webcam app for Linux — take photos and record videos with your webcam."
+                   TextWrapping="Wrap" Foreground="#C8C8C8" FontSize="12"/>
+
+        <TextBlock Text="Links" FontWeight="SemiBold" Margin="0,4,0,0"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Repository" Click="OnOpenRepository"
+                    ToolTip.Tip="https://github.com/amuza2/camonlinux"/>
+            <Button Content="Report an issue" Click="OnReportIssue"/>
+            <Button Content="Releases" Click="OnOpenReleases"/>
+            <Button Content="Licence" Click="OnOpenLicense"/>
+        </StackPanel>
+
+        <TextBlock Text="Built with" FontWeight="SemiBold" Margin="0,4,0,0"/>
+        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#A8A8A8"
+                   Text="Avalonia UI · FluentAvalonia · GStreamer (GirCore) · SkiaSharp · CommunityToolkit.Mvvm"/>
+
+        <TextBlock Text="Diagnostics" FontWeight="SemiBold" Margin="0,4,0,0"/>
+        <TextBlock Text="Include this when reporting a problem — it says which optional pieces were present."
+                   FontSize="11" Foreground="#8A8A8A" TextWrapping="Wrap"/>
+        <TextBox x:Name="DiagnosticsBox"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="NoWrap"
+                 FontFamily="monospace"
+                 FontSize="12"
+                 Height="150"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+            <Button Content="Copy diagnostics" Click="OnCopyDiagnostics"/>
+            <Button Content="Close" Classes="accent" Click="OnClose" MinWidth="80"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

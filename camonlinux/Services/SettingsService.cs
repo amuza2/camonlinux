@@ -43,6 +43,9 @@ public sealed class SettingsService : IDisposable
 
     public AppSettings Settings { get; }
 
+    /// <summary>Full path of the settings file. Shown in the About diagnostics.</summary>
+    public string SettingsPath => _settingsPath;
+
     /// <param name="configDirectory">
     /// Directory the settings file lives in. Defaults to <c>~/.config/camonlinux</c>;
     /// tests pass a temporary directory so they never touch the real user config.

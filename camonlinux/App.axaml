@@ -43,5 +43,20 @@
         <Style Selector="TextBlock.slider-value:disabled">
             <Setter Property="Foreground" Value="#6E6E6E" />
         </Style>
+
+        <!-- Status indicator for modes that only live in a menu (mask, virtual camera),
+             so their state is still visible at a glance. -->
+        <Style Selector="Border.status-pill">
+            <Setter Property="Background" Value="#33FF9800" />
+            <Setter Property="BorderBrush" Value="#66FF9800" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.status-pill TextBlock">
+            <Setter Property="Foreground" Value="#FFCC80" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
     </Application.Styles>
 </Application>

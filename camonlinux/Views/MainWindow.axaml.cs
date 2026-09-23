@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using camonlinux.Capture;
 using camonlinux.Masking;
+using camonlinux.Models;
 using camonlinux.Services;
 using camonlinux.ViewModels;
 
@@ -75,20 +76,22 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Toolbar Webcam toggle: shares the live (masked/adjusted) preview as a virtual
-    /// webcam via v4l2loopback. If the module isn't loaded, tells the user how to.
+    /// Shares the live (masked/adjusted) preview as a virtual webcam via v4l2loopback.
+    /// If the module isn't loaded, tells the user how to.
+    ///
+    /// Works from both the Tools menu item and any toolbar toggle: the control's IsChecked
+    /// is two-way bound to the view model, so the state is read from there and written
+    /// back there on failure — which reverts whichever control raised the event.
     /// </summary>
     private async void OnVirtualCamToggled(object? sender, RoutedEventArgs e)
     {
-        if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm)
             return;
 
-        var enable = tb.IsChecked == true;
-        vm.IsVirtualCamEnabled = enable;
+        var enable = vm.IsVirtualCamEnabled;
         if (_virtualCamera is null)
         {
             vm.IsVirtualCamEnabled = false;
-            tb.IsChecked = false;
             vm.ShowToast("Virtual webcam is not available.");
             return;
         }
@@ -99,7 +102,6 @@ public partial class MainWindow : Window
             if (device is null)
             {
                 vm.IsVirtualCamEnabled = false;
-                tb.IsChecked = false;
                 vm.ShowToast("Virtual webcam unavailable — v4l2loopback module not loaded");
                 var help = new VirtualCamHelpWindow();
                 await help.ShowDialog(this);
@@ -115,7 +117,6 @@ public partial class MainWindow : Window
             else
             {
                 vm.IsVirtualCamEnabled = false;
-                tb.IsChecked = false;
                 vm.ShowToast($"Failed to start virtual webcam: {_virtualCamera.LastError}");
             }
         }
@@ -127,15 +128,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Toolbar Mask toggle: toggles masking and opens/closes the editor. Changes made
-    /// in the editor apply to the live preview immediately; closing the editor window
-    /// keeps the mask active (it only turns off via this toolbar toggle).
+    /// Toggles masking and opens/closes the editor. Changes made in the editor apply to
+    /// the live preview immediately; closing the editor window keeps the mask active (it
+    /// only turns off via this toggle).
+    ///
+    /// Control-agnostic for the same reason as <see cref="OnVirtualCamToggled"/>.
     /// </summary>
     private void OnMaskToggled(object? sender, RoutedEventArgs e)
     {
-        if (sender is not ToggleButton tb || DataContext is not MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm)
             return;
-        vm.IsMaskEnabled = tb.IsChecked == true;
+
         if (vm.IsMaskEnabled)
         {
             if (_maskEditorWindow is null)
@@ -150,6 +153,50 @@ public partial class MainWindow : Window
         {
             _maskEditorWindow.Close();
             _maskEditorWindow = null;
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    // Camera menu submenus (device / resolution / rotation / zoom)
+    // ------------------------------------------------------------------ //
+
+    /// <summary>
+    /// Builds the four choice submenus of the Camera menu from the view model's
+    /// collections. They are filled on demand when the menu opens rather than kept in
+    /// sync by hand — the lists change as cameras are plugged in and as the selected
+    /// device's supported modes are enumerated.
+    /// </summary>
+    private void OnCameraSubmenuOpened(object? sender, RoutedEventArgs e) => RebuildCameraMenus();
+
+    private void RebuildCameraMenus()
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+
+        FillChoices(DeviceMenu, vm.DeviceMenuChoices, vm.SelectDeviceCommand);
+        FillChoices(ResolutionMenu, vm.ResolutionMenuChoices, vm.SelectResolutionCommand);
+        FillChoices(RotationMenu, vm.RotationMenuChoices, vm.SelectRotationCommand);
+        FillChoices(ZoomMenu, vm.ZoomMenuChoices, vm.SelectZoomCommand);
+    }
+
+    private static void FillChoices(
+        MenuItem menu,
+        IReadOnlyList<MenuChoice> choices,
+        System.Windows.Input.ICommand command)
+    {
+        menu.Items.Clear();
+        foreach (var choice in choices)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = choice.Header,
+                Command = command,
+                CommandParameter = choice.Parameter,
+                // Radio gives the tick beside the active entry; items sharing a parent
+                // group together automatically.
+                ToggleType = MenuItemToggleType.Radio,
+                IsChecked = choice.IsChecked,
+            });
         }
     }
 

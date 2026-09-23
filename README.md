@@ -19,13 +19,17 @@ Inspired by KDE's Kamoso, but written from scratch in C#.
 - **Record quality + auto-split** — Low/Med/High `x264enc` bitrate, and an optional size cap that splits long recordings into numbered parts (`video_…-1.mkv`, `video_…-2.mkv`) without stopping the preview
 - **Rotation & digital zoom** — 90°/180°/270° rotation (for sideways-mounted cams) and up to 4× smooth digital zoom (crop + `videoscale`), applied to the preview, photos and recordings
 - **Live camera controls** — brightness / contrast / saturation sliders that set the v4l2 controls instantly via `v4l2-ctl` (no pipeline rebuild); values persist
-- **Timestamp overlay** — a **Stamp** toggle burns the date & time into the corner of photos (SkiaSharp) and recordings (`textoverlay`)
-- Mirror toggle
+- **Timestamp overlay** — a **Stamp** menu toggle burns the date & time into the corner of photos (SkiaSharp) and recordings (`textoverlay`)
+- Mirror toggle (Camera ▸ Mirror Image, or `M`)
 - Camera selection with friendly names (e.g. "Logitech Webcam C930e" — read from sysfs, deduped to real capture nodes)
 - **Device hot-plug detection** — the camera list refreshes automatically every 2 s; plug in a camera and it appears (and can auto-start), unplug the active one and it switches to another / stops gracefully
-- Recent captures gallery with **photo & video thumbnails**, **play videos** (system player), **copy / move / rename / delete**, plus a **settings window** (⚙) to pick the photo & video folders
+- Recent captures gallery with **photo & video thumbnails**, **play videos** (system player) and **delete** (to the trash), plus a **settings window** to pick the photo & video folders
+- **Menu bar** — File / Camera / View / Tools / Help. The toolbar keeps the two controls worth one click (camera and resolution); mirror, timestamp, mask, virtual webcam, rescan, rotation and zoom live in the menus, where the active value is shown in the submenu title and ticked in the list
+- **Status pills** for Mask and Virtual Webcam, so a mode that now lives in a menu (and a live virtual camera in particular) is still visible at a glance
+- **About window** (Help ▸ About) with version, links and a copyable diagnostics block
+- **Hideable right panel** (View ▸ Captures & Effects Panel)
 - **Audio device picker** — choose which mic to record (lists PipeWire/Pulse sources via `pactl`, monitors excluded)
-- **Keyboard shortcuts** — `Space` photo, `R` record, `B` burst, `M` mirror, `E` effects, `F11` fullscreen
+- **Keyboard shortcuts** — `Space` photo, `R` record, `B` burst, `M` mirror, `E` effects, `F11` fullscreen, `Ctrl+Q` quit. The same gestures are shown beside the matching menu entries; `Window.KeyBindings` is what actually runs them, so the two places must be kept in step
 - **Mouse-wheel zoom** over the preview, **live recording file size** beside the timer, **effect search box**, **toast notifications**, **delete confirmation**, **auto-refreshing gallery**, and the window **remembers its size/state**
 - **Single-instance guard** — a second launch notifies and exits instead of fighting over the camera
 - Desktop notifications (`notify-send`)
@@ -156,7 +160,7 @@ v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
 - [x] Record quality (Low/Med/High) + auto-split at a size cap
 - [x] Countdown self-timer (3 s / 10 s before a photo)
 - [x] Rotation (90°/180°/270°) + digital zoom (up to 4×)
-- [ ] AppStream metainfo + AUR PKGBUILD
+- [x] AppStream metainfo + AUR PKGBUILD
 - [ ] i18n
 
 ## Troubleshooting
@@ -165,8 +169,12 @@ v4l2src {+ mode caps} ! videoconvert ! videoflip ! {effect} ! tee
   device exists (`ls /dev/video*`), and no other app holds it open.
 - **Missing GStreamer plugins** — `x264enc` comes from `gst-plugins-ugly`;
   `v4l2src` from `gst-plugins-good`.
-- **No audio in recordings (planned)** — the current MVP records video only;
-  audio capture (PipeWire/pulse) is a follow-up.
+- **Recordings have no sound** — check the **Mic** toggle isn't muting, and that
+  the **Audio** dropdown is pointing at the mic you expect (recording goes through
+  `autoaudiosrc`, so a source that only exists as a PulseAudio/PipeWire monitor can
+  end up silent).
+- **`textoverlay`/`jpegdec` not found** — install `gst-plugins-base` and
+  `gst-plugins-good` respectively.
 
 ## License
 

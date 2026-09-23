@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
+using camonlinux.Models;
 using camonlinux.Services;
 using camonlinux.ViewModels;
 using Xunit;
@@ -495,5 +497,170 @@ public sealed class MainWindowViewModelTests : IDisposable
 
             Assert.InRange(ratio, 1.70, 1.85); // ~16:9, allowing for rounding
         }
+    }
+
+    // ------------------------------------------------------------------ //
+    // Menu bar
+    // ------------------------------------------------------------------ //
+
+    [Fact]
+    public void ShowRightPanel_StartsVisible()
+    {
+        Assert.True(CreateViewModel().ShowRightPanel);
+    }
+
+    [Fact]
+    public void ShowRightPanel_RestoresTheSavedValue()
+    {
+        _settings.Settings.ShowRightPanel = false;
+        _settings.Save();
+
+        Assert.False(CreateViewModel().ShowRightPanel);
+    }
+
+    [Fact]
+    public void ShowRightPanel_IsPersistedWhenToggledFromTheViewMenu()
+    {
+        var vm = CreateViewModel();
+
+        vm.ShowRightPanel = false;
+        _settings.Save(); // flush the debounced write
+
+        using var reloaded = new SettingsService(_configDir);
+        Assert.False(reloaded.Settings.ShowRightPanel);
+    }
+
+    [Fact]
+    public void ShowRightPanel_NotifiesSoThePanelHides()
+    {
+        var vm = CreateViewModel();
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.ShowRightPanel = false;
+
+        Assert.Contains(nameof(MainWindowViewModel.ShowRightPanel), changed);
+    }
+
+    [Fact]
+    public void DeviceMenuHeader_SaysNoneBeforeACameraIsSelected()
+    {
+        Assert.Equal("Device: none", CreateViewModel().DeviceMenuHeader);
+    }
+
+    [Fact]
+    public void MenuHeaders_TrackTheSelectedValue()
+    {
+        // The submenus are titles plus a tick list, so the header is the only place the
+        // active value is visible without opening them. A stale header is easy to miss.
+        var vm = CreateViewModel();
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.SelectedResolution = "1280x720";
+        vm.SelectedRotation = "90°";
+        vm.SelectedZoom = "2×";
+
+        Assert.Equal("Resolution: 1280x720", vm.ResolutionMenuHeader);
+        Assert.Equal("Rotation: 90°", vm.RotationMenuHeader);
+        Assert.Equal("Digital Zoom: 2×", vm.ZoomMenuHeader);
+
+        Assert.Contains(nameof(MainWindowViewModel.ResolutionMenuHeader), changed);
+        Assert.Contains(nameof(MainWindowViewModel.RotationMenuHeader), changed);
+        Assert.Contains(nameof(MainWindowViewModel.ZoomMenuHeader), changed);
+    }
+
+    [Fact]
+    public void MenuHeaders_ShowTheDefaultsBeforeAnythingIsLoaded()
+    {
+        var vm = CreateViewModel();
+
+        // SelectedResolution is "Default" (meaning the camera's native mode) once settings
+        // have loaded, and "0°"/"1×" are real values rather than "unset".
+        Assert.Equal("Resolution: Default", vm.ResolutionMenuHeader);
+        Assert.Equal("Rotation: 0°", vm.RotationMenuHeader);
+        Assert.Equal("Digital Zoom: 1×", vm.ZoomMenuHeader);
+    }
+
+    // The submenus are only populated when they are opened, so a mistake in them is
+    // invisible until somebody clicks the menu — hence testing the contents here rather
+    // than leaving the projection in the view's code-behind.
+
+    [Fact]
+    public void DeviceMenuChoices_ListsEveryCameraWithItsOwnValueToRunTheCommandOn()
+    {
+        var vm = CreateViewModel();
+        var first = new CameraDevice("1", "Integrated Camera", "/dev/video0");
+        var second = new CameraDevice("2", "USB Camera", "/dev/video2");
+        vm.Devices.Add(first);
+        vm.Devices.Add(second);
+
+        var choices = vm.DeviceMenuChoices;
+
+        Assert.Equal(new[] { "Integrated Camera", "USB Camera" }, choices.Select(c => c.Header));
+        Assert.Same(first, choices[0].Parameter);
+        Assert.Same(second, choices[1].Parameter);
+        // No camera is selected on a fresh view model, so nothing is ticked.
+        Assert.DoesNotContain(choices, c => c.IsChecked);
+    }
+
+    [Fact]
+    public void ResolutionMenuChoices_IncludesTheCamerasModesAndTicksTheActiveOne()
+    {
+        var vm = CreateViewModel();
+        vm.Resolutions.Add("1280x720");
+        vm.Resolutions.Add("1920x1080");
+        vm.SelectedResolution = "1920x1080";
+
+        var choices = vm.ResolutionMenuChoices;
+
+        Assert.Contains(choices, c => Equals(c.Parameter, "1280x720"));
+        Assert.Equal("1920x1080", choices.Single(c => c.IsChecked).Parameter);
+        Assert.Single(choices, c => c.IsChecked);
+    }
+
+    [Fact]
+    public void RotationAndZoomMenuChoices_TickTheActiveValue()
+    {
+        var vm = CreateViewModel();
+
+        vm.SelectedRotation = "270°";
+        vm.SelectedZoom = "2×";
+
+        Assert.Equal("270°", vm.RotationMenuChoices.Single(c => c.IsChecked).Parameter);
+        Assert.Equal("2×", vm.ZoomMenuChoices.Single(c => c.IsChecked).Parameter);
+        Assert.Equal(vm.RotationOptions.Count, vm.RotationMenuChoices.Count);
+        Assert.Equal(vm.ZoomOptions.Count, vm.ZoomMenuChoices.Count);
+    }
+
+    [Theory]
+    [InlineData("USB_CAM", "USB__CAM")]
+    [InlineData("no underscores", "no underscores")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void MenuText_EscapesUnderscoresSoTheyRenderLiterally(string? value, string expected)
+    {
+        // A menu header is access text: one "_" is swallowed and the next character is
+        // underlined, so a device called USB_CAM would render as USBCAM.
+        Assert.Equal(expected, MenuText.Escape(value));
+    }
+
+    [Fact]
+    public void MenuChoices_EscapeUnderscoresInDeviceNames()
+    {
+        var vm = CreateViewModel();
+        vm.Devices.Add(new CameraDevice("1", "USB_CAM", "/dev/video0"));
+
+        Assert.Equal("USB__CAM", vm.DeviceMenuChoices[0].Header);
+    }
+
+    [Fact]
+    public void MenuHeaders_EscapeUnderscoresInTheSelectedValue()
+    {
+        var vm = CreateViewModel();
+
+        vm.SelectedResolution = "1280_x720";
+
+        Assert.Equal("Resolution: 1280__x720", vm.ResolutionMenuHeader);
     }
 }

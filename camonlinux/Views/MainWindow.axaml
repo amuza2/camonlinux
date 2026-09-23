@@ -23,82 +23,93 @@
         <KeyBinding Gesture="M" Command="{Binding ToggleMirrorCommand}"/>
         <KeyBinding Gesture="E" Command="{Binding ToggleEffectsPanelCommand}"/>
         <KeyBinding Gesture="F11" Command="{Binding ToggleFullScreenCommand}"/>
+        <KeyBinding Gesture="Ctrl+Q" Command="{Binding QuitCommand}"/>
     </Window.KeyBindings>
 
     <DockPanel Background="Black">
 
-        <!-- Top toolbar -->
-        <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-                    <ToggleButton IsChecked="{Binding Mirrored}"
-                                  ToolTip.Tip="Mirror the camera view">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x21C4;"/>
-                            <TextBlock Text="Mirror"/>
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton IsChecked="{Binding ShowTimestamp}"
-                                  ToolTip.Tip="Stamp photos &amp; videos with the date and time">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x1F552;"/>
-                            <TextBlock Text="Stamp"/>
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton IsChecked="{Binding IsMaskEnabled}" Click="OnMaskToggled"
-                                  ToolTip.Tip="Enable masking and open the Mask Editor">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x1F3AD;"/>
-                            <TextBlock Text="Mask"/>
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton IsChecked="{Binding IsVirtualCamEnabled}" Click="OnVirtualCamToggled"
-                                  ToolTip.Tip="Share the preview as a virtual webcam (needs the v4l2loopback module)">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x1F3A5;"/>
-                            <TextBlock Text="Webcam"/>
-                        </StackPanel>
-                    </ToggleButton>
-                    <Button Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Scan for cameras">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x21BB;"/>
-                            <TextBlock Text="Devices"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding OpenMediaFolderCommand}" ToolTip.Tip="Open the photos folder">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x1F4C2;"/>
-                            <TextBlock Text="Folder"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding OpenSettingsCommand}" ToolTip.Tip="Settings">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="&#x2699;"/>
-                            <TextBlock Text="Settings"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
+        <!-- Menu bar.
+             Shortcut display and shortcut handling are deliberately separate:
+             MenuItem.InputGesture only *displays* a gesture (the Avalonia docs say so
+             explicitly), while Window.KeyBindings above is the single thing that
+             executes them. Registering both would fire a toggle twice — which reads as
+             "the button does nothing". If a shortcut changes, change both places. -->
+        <Menu DockPanel.Dock="Top" Background="#202020">
+            <MenuItem Header="_File">
+                <MenuItem Header="Take _Photo" Command="{Binding TakePhotoCommand}"
+                          InputGesture="Space"/>
+                <MenuItem Header="{Binding RecordButtonText}" Command="{Binding ToggleRecordingCommand}"
+                          InputGesture="R"/>
+                <MenuItem Header="{Binding BurstButtonText}" Command="{Binding ToggleBurstCommand}"
+                          InputGesture="B"/>
+                <MenuItem Header="-"/>
+                <MenuItem Header="Open Captures _Folder" Command="{Binding OpenMediaFolderCommand}"/>
+                <MenuItem Header="_Settings…" Command="{Binding OpenSettingsCommand}"/>
+                <MenuItem Header="-"/>
+                <MenuItem Header="_Quit" Command="{Binding QuitCommand}" InputGesture="Ctrl+Q"/>
+            </MenuItem>
 
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <ComboBox ItemsSource="{Binding Devices}"
-                              SelectedItem="{Binding SelectedDevice}"
-                              PlaceholderText="Select a camera"
-                              Width="240"
-                              DisplayMemberBinding="{Binding Name}"/>
-                    <ComboBox ItemsSource="{Binding Resolutions}"
-                              SelectedItem="{Binding SelectedResolution}"
-                              Width="130"
-                              ToolTip.Tip="Capture resolution (per camera)"/>
-                    <ComboBox ItemsSource="{Binding RotationOptions}"
-                              SelectedItem="{Binding SelectedRotation}"
-                              Width="64"
-                              ToolTip.Tip="Rotate the image"/>
-                    <ComboBox ItemsSource="{Binding ZoomOptions}"
-                              SelectedItem="{Binding SelectedZoom}"
-                              Width="64"
-                              ToolTip.Tip="Digital zoom"/>
-                </StackPanel>
-            </DockPanel>
+            <MenuItem Header="_Camera">
+                <MenuItem x:Name="DeviceMenu" Header="{Binding DeviceMenuHeader}"
+                          SubmenuOpened="OnCameraSubmenuOpened"/>
+                <MenuItem x:Name="ResolutionMenu" Header="{Binding ResolutionMenuHeader}"
+                          SubmenuOpened="OnCameraSubmenuOpened"/>
+                <MenuItem x:Name="RotationMenu" Header="{Binding RotationMenuHeader}"
+                          SubmenuOpened="OnCameraSubmenuOpened"/>
+                <MenuItem x:Name="ZoomMenu" Header="{Binding ZoomMenuHeader}"
+                          SubmenuOpened="OnCameraSubmenuOpened"/>
+                <MenuItem Header="-"/>
+                <!-- IsChecked is registered without a default two-way binding mode on
+                     MenuItem (unlike ToggleButton), so Mode=TwoWay is required here. -->
+                <MenuItem Header="_Mirror Image" ToggleType="CheckBox"
+                          IsChecked="{Binding Mirrored, Mode=TwoWay}" InputGesture="M"/>
+                <MenuItem Header="Timestamp" ToggleType="CheckBox"
+                          IsChecked="{Binding ShowTimestamp, Mode=TwoWay}"/>
+                <MenuItem Header="-"/>
+                <MenuItem Header="_Rescan Cameras" Command="{Binding RefreshDevicesCommand}"/>
+                <MenuItem Header="Reset Camera Controls" Command="{Binding ResetCameraControlsCommand}"/>
+            </MenuItem>
+
+            <MenuItem Header="_View">
+                <MenuItem Header="Captures &amp; Effects Panel" ToggleType="CheckBox"
+                          IsChecked="{Binding ShowRightPanel, Mode=TwoWay}"/>
+                <MenuItem Header="Show _Effects" ToggleType="CheckBox"
+                          IsChecked="{Binding ShowEffectsPanel, Mode=TwoWay}" InputGesture="E"/>
+                <MenuItem Header="-"/>
+                <MenuItem Header="_Fullscreen" Command="{Binding ToggleFullScreenCommand}"
+                          InputGesture="F11"/>
+            </MenuItem>
+
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Mask Editor" ToggleType="CheckBox"
+                          IsChecked="{Binding IsMaskEnabled, Mode=TwoWay}"
+                          Click="OnMaskToggled"/>
+                <MenuItem Header="_Virtual Webcam" ToggleType="CheckBox"
+                          IsChecked="{Binding IsVirtualCamEnabled, Mode=TwoWay}"
+                          Click="OnVirtualCamToggled"/>
+            </MenuItem>
+
+            <MenuItem Header="_Help">
+                <MenuItem Header="Virtual Camera _Setup…" Command="{Binding OpenVirtualCamHelpCommand}"/>
+                <MenuItem Header="-"/>
+                <MenuItem Header="_About camonlinux" Command="{Binding OpenAboutCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar: only the two controls worth having one click away. Everything else
+             moved into the menus (the row was ~950px of controls in a 960px window). -->
+        <Border DockPanel.Dock="Top" Padding="10,8" Background="#202020">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ComboBox ItemsSource="{Binding Devices}"
+                          SelectedItem="{Binding SelectedDevice}"
+                          PlaceholderText="Select a camera"
+                          Width="240"
+                          DisplayMemberBinding="{Binding Name}"/>
+                <ComboBox ItemsSource="{Binding Resolutions}"
+                          SelectedItem="{Binding SelectedResolution}"
+                          Width="130"
+                          ToolTip.Tip="Capture resolution (per camera)"/>
+            </StackPanel>
         </Border>
 
         <!-- Camera controls (brightness / contrast / saturation / advanced) -->
@@ -185,7 +196,8 @@
         </Border>
 
         <!-- Right panel: captures / effects. Drag its left edge to resize it. -->
-        <Border DockPanel.Dock="Right" Width="{Binding RightPanelWidth}" Background="#202020">
+        <Border DockPanel.Dock="Right" Width="{Binding RightPanelWidth}" Background="#202020"
+                IsVisible="{Binding ShowRightPanel}">
             <DockPanel>
             <!-- Resize grip. The panel is docked to the right, so dragging the grip
                  left widens it and dragging right narrows it; double-clicking
@@ -343,14 +355,30 @@
             </DockPanel>
         </Border>
 
-        <!-- Capture controls (Photo / Video tabs) -->
+        <!-- Capture controls (Photo / Video tabs).
+             A WrapPanel rather than a StackPanel: the finished bar is wider than the
+             minimum window width, and a bar that clips silently hides the record
+             button. Hidden children (the timer, the status pills) add no spacing, so
+             the common case still looks like one evenly spaced row. -->
         <Border DockPanel.Dock="Bottom" Padding="10" Background="#202020">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="14">
+            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                       ItemSpacing="14" LineSpacing="8" ItemsAlignment="Center">
                 <TextBlock Text="{Binding RecordingTime}" FontSize="16" FontFamily="monospace"
                            Foreground="#FF5252" IsVisible="{Binding IsRecording}"
                            VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding RecordingSize}" FontSize="14" Foreground="#FF8A80"
                            IsVisible="{Binding IsRecording}" VerticalAlignment="Center"/>
+
+                <!-- State indicators. Mask and the virtual webcam now live only in the
+                     Tools menu, so this is where their state stays visible without
+                     opening the menu — a live virtual camera in particular must not be
+                     something you can forget about. -->
+                <Border Classes="status-pill" IsVisible="{Binding IsMaskEnabled}">
+                    <TextBlock Text="Mask on"/>
+                </Border>
+                <Border Classes="status-pill" IsVisible="{Binding IsVirtualCamEnabled}">
+                    <TextBlock Text="Virtual camera live"/>
+                </Border>
 
                 <!-- Mode tabs -->
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="2" VerticalAlignment="Center">
@@ -403,7 +431,7 @@
                                   Width="132" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <!-- Preview area -->

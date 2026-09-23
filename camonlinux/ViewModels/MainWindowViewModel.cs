@@ -69,6 +69,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(TakePhotoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ToggleRecordingCommand))]
+    [NotifyPropertyChangedFor(nameof(DeviceMenuHeader))]
     private CameraDevice? _selectedDevice;
 
     [ObservableProperty]
@@ -117,7 +118,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _micEnabled = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ResolutionMenuHeader))]
     private string _selectedResolution = "";
+
+    /// <summary>Menu label showing the active resolution without opening the submenu.</summary>
+    public string ResolutionMenuHeader => $"Resolution: {MenuText.Escape(SelectedResolution)}";
 
     [ObservableProperty]
     private string _selectedQuality = "Medium";
@@ -138,15 +143,26 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isFlashing;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RotationMenuHeader))]
     private string _selectedRotation = "0°";
 
+    /// <summary>Menu label showing the active rotation without opening the submenu.</summary>
+    public string RotationMenuHeader => $"Rotation: {MenuText.Escape(SelectedRotation)}";
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomMenuHeader))]
     private string _selectedZoom = "1×";
+
+    /// <summary>Menu label showing the active digital zoom without opening the submenu.</summary>
+    public string ZoomMenuHeader => $"Digital Zoom: {MenuText.Escape(SelectedZoom)}";
+
+    /// <summary>Menu label showing the active camera without opening the submenu.</summary>
+    public string DeviceMenuHeader => $"Device: {(SelectedDevice is null ? "none" : MenuText.Escape(SelectedDevice.Name))}";
 
     [ObservableProperty]
     private string _selectedPhotoFormat = "JPEG";
 
-        [ObservableProperty]
+    [ObservableProperty]
     private bool _showTimestamp;
 
     [ObservableProperty]
@@ -239,6 +255,12 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private bool _isMaskEnabled;
     [ObservableProperty] private bool _isVirtualCamEnabled;
     [ObservableProperty] private string _virtualCamBackground = "Black";
+
+    /// <summary>
+    /// Whether the right (captures / effects) panel is shown. Toggled from the View menu;
+    /// persisted so the layout survives a restart.
+    /// </summary>
+    [ObservableProperty] private bool _showRightPanel = true;
 
     /// <summary>Smallest width the right (captures / effects) panel can be dragged to.</summary>
     public const double MinPanelWidth = 200;
@@ -354,6 +376,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // Assign the field, not the property, so restoring a saved width doesn't write
         // it straight back to disk on startup.
         _rightPanelWidth = ClampPanelWidth(settings.Settings.RightPanelWidth);
+        _showRightPanel = settings.Settings.ShowRightPanel;
         _selectedRotation = MapRotationLabel(settings.Settings.Rotation);
         _selectedZoom = MapZoomLabel(settings.Settings.Zoom);
         _photoFormat = settings.Settings.PhotoFormat;
@@ -808,6 +831,86 @@ public partial class MainWindowViewModel : ViewModelBase
         // Dragging the grip fires this continuously — coalesce the disk writes.
         _settings.QueueSave();
     }
+
+    partial void OnShowRightPanelChanged(bool value)
+    {
+        _settings.Settings.ShowRightPanel = value;
+        _settings.Save();
+    }
+
+    // ------------------------------------------------------------------ //
+    // Menu commands
+    // ------------------------------------------------------------------ //
+
+    /// <summary>Entries for the Camera ▸ Device submenu.</summary>
+    public IReadOnlyList<MenuChoice> DeviceMenuChoices =>
+        Devices.Select(d => new MenuChoice(MenuText.Escape(d.Name), d, d == SelectedDevice)).ToList();
+
+    /// <summary>Entries for the Camera ▸ Resolution submenu.</summary>
+    public IReadOnlyList<MenuChoice> ResolutionMenuChoices =>
+        Resolutions.Select(r => new MenuChoice(MenuText.Escape(r), r, r == SelectedResolution)).ToList();
+
+    /// <summary>Entries for the Camera ▸ Rotation submenu.</summary>
+    public IReadOnlyList<MenuChoice> RotationMenuChoices =>
+        RotationOptions.Select(r => new MenuChoice(MenuText.Escape(r), r, r == SelectedRotation)).ToList();
+
+    /// <summary>Entries for the Camera ▸ Digital Zoom submenu.</summary>
+    public IReadOnlyList<MenuChoice> ZoomMenuChoices =>
+        ZoomOptions.Select(z => new MenuChoice(MenuText.Escape(z), z, z == SelectedZoom)).ToList();
+
+    /// <summary>Selects a camera from the Camera ▸ Device submenu.</summary>
+    [RelayCommand]
+    private void SelectDevice(CameraDevice? device)
+    {
+        if (device is not null)
+            SelectedDevice = device;
+    }
+
+    /// <summary>Selects a capture mode from the Camera ▸ Resolution submenu.</summary>
+    [RelayCommand]
+    private void SelectResolution(string? resolution)
+    {
+        if (!string.IsNullOrEmpty(resolution))
+            SelectedResolution = resolution;
+    }
+
+    /// <summary>Selects a rotation from the Camera ▸ Rotation submenu.</summary>
+    [RelayCommand]
+    private void SelectRotation(string? rotation)
+    {
+        if (!string.IsNullOrEmpty(rotation))
+            SelectedRotation = rotation;
+    }
+
+    /// <summary>Selects a zoom level from the Camera ▸ Digital Zoom submenu.</summary>
+    [RelayCommand]
+    private void SelectZoom(string? zoom)
+    {
+        if (!string.IsNullOrEmpty(zoom))
+            SelectedZoom = zoom;
+    }
+
+    /// <summary>Opens the virtual-camera setup instructions (Help menu).</summary>
+    [RelayCommand]
+    private void OpenVirtualCamHelp()
+    {
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+
+        try
+        {
+            _ = new VirtualCamHelpWindow().ShowDialog(owner);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not open help: {ex.Message}";
+        }
+    }
+
+    /// <summary>Quits: closing the only window shuts the application down.</summary>
+    [RelayCommand]
+    private void Quit() => MainWindow?.Close();
 
     private static string MapBurstIntervalLabel(double seconds) => seconds switch
     {
@@ -1593,16 +1696,8 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>Opens a file or folder with the system default application (xdg-open).</summary>
     private void OpenWithDefaultApp(string path)
     {
-        try
-        {
-            var psi = new ProcessStartInfo { FileName = "xdg-open", UseShellExecute = false };
-            psi.ArgumentList.Add(path);
-            Process.Start(psi);
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Could not open: {ex.Message}";
-        }
+        if (!SystemLauncher.Open(path))
+            StatusMessage = $"Could not open {Path.GetFileName(path)} — no default application found.";
     }
 
     /// <summary>Shows a brief overlay toast that auto-hides.</summary>
@@ -1892,5 +1987,29 @@ public partial class MainWindowViewModel : ViewModelBase
         RefreshGallery();
         ShowToast("Settings saved");
         StatusMessage = "Settings saved.";
+    }
+
+    /// <summary>
+    /// Shows the About dialog: identity, licence, links and a diagnostics block, so a bug
+    /// report can state which optional pieces (effects, virtual camera, …) were present.
+    /// </summary>
+    [RelayCommand]
+    private void OpenAbout()
+    {
+        var owner = MainWindow;
+        if (owner is null)
+            return;
+
+        try
+        {
+            var diagnostics = AppDiagnostics.Build(_capture, Effects.Count, _settings.SettingsPath);
+            _ = new AboutWindow(diagnostics).ShowDialog(owner);
+        }
+        catch (Exception ex)
+        {
+            // Never let a dialog failure take the app down — report it like the other
+            // window-opening paths do.
+            StatusMessage = $"Could not open About: {ex.Message}";
+        }
     }
 }

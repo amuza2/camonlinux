@@ -42,6 +42,9 @@ public sealed class AppSettings
     /// <summary>Width of the right (captures / effects) panel, in pixels. Drag-resizable.</summary>
     public double RightPanelWidth { get; set; } = 240;
 
+    /// <summary>Whether the right panel is shown at all (View menu toggle).</summary>
+    public bool ShowRightPanel { get; set; } = true;
+
     public string? LastDeviceId { get; set; }
 
     /// <summary>Background used for masked-out (transparent) areas of the virtual webcam.</summary>
