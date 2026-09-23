@@ -1,6 +1,6 @@
 <div align="center">
 
-![camonlinux](packaging/icons/camonlinux-256.png)
+![camonlinux](packaging/icons/camonlinux-128.png)
 
 # camonlinux
 
@@ -13,6 +13,9 @@ backend. camonlinux takes photos and records videos with your webcam, with live 
 background masking and a virtual-camera output.
 
 Inspired by KDE's Kamoso, but written from scratch in **C# / .NET 10**.
+
+<img width="1773" height="1016" alt="image" src="https://github.com/user-attachments/assets/63691fdb-d218-437d-8baf-206dbd8eccf2" />
+
 
 <!-- Screenshot: drag-and-drop your image into a GitHub comment or issue, copy the
      resulting user-attachments URL into src below, then delete the comment markers.
