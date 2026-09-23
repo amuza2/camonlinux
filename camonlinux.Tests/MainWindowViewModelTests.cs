@@ -326,6 +326,67 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     // ------------------------------------------------------------------ //
+    // Camera control sliders
+    // ------------------------------------------------------------------ //
+
+    [Theory]
+    [InlineData(nameof(MainWindowViewModel.Brightness))]
+    [InlineData(nameof(MainWindowViewModel.Contrast))]
+    [InlineData(nameof(MainWindowViewModel.Saturation))]
+    [InlineData(nameof(MainWindowViewModel.Sharpness))]
+    [InlineData(nameof(MainWindowViewModel.Gain))]
+    [InlineData(nameof(MainWindowViewModel.BacklightCompensation))]
+    [InlineData(nameof(MainWindowViewModel.WhiteBalanceTemperature))]
+    [InlineData(nameof(MainWindowViewModel.ExposureValue))]
+    [InlineData(nameof(MainWindowViewModel.FocusValue))]
+    public void CameraControlSliders_NotifySoTheValueReadoutFollowsTheDrag(string property)
+    {
+        // Every camera-control slider has a readout bound to the same property the slider
+        // writes to (slider Value is TwoWay), so this notification is what makes the
+        // readout track the drag. This codebase has already had two bugs of exactly this
+        // shape — a value that updates in the view model but never reaches the UI.
+        var vm = CreateViewModel();
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        switch (property)
+        {
+            case nameof(MainWindowViewModel.Brightness):
+                vm.Brightness = 200;
+                break;
+            case nameof(MainWindowViewModel.Contrast):
+                vm.Contrast = 200;
+                break;
+            case nameof(MainWindowViewModel.Saturation):
+                vm.Saturation = 200;
+                break;
+            case nameof(MainWindowViewModel.Sharpness):
+                vm.Sharpness = 200;
+                break;
+            case nameof(MainWindowViewModel.Gain):
+                vm.Gain = 200;
+                break;
+            case nameof(MainWindowViewModel.BacklightCompensation):
+                vm.BacklightCompensation = 1;
+                break;
+            case nameof(MainWindowViewModel.WhiteBalanceTemperature):
+                vm.WhiteBalanceTemperature = 5000;
+                break;
+            case nameof(MainWindowViewModel.ExposureValue):
+                vm.ExposureValue = 500;
+                break;
+            case nameof(MainWindowViewModel.FocusValue):
+                vm.FocusValue = 120;
+                break;
+            default:
+                Assert.Fail($"Unhandled property {property}");
+                break;
+        }
+
+        Assert.Contains(property, changed);
+    }
+
+    // ------------------------------------------------------------------ //
     // Gallery thumbnails track the panel width
     // ------------------------------------------------------------------ //
 

@@ -108,14 +108,20 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="Bright" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding Brightness}" Minimum="0" Maximum="255" Width="140"/>
+                        <TextBlock Classes="slider-value" Text="{Binding Brightness, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Brightness (0-255)"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="Contrast" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding Contrast}" Minimum="0" Maximum="255" Width="140"/>
+                        <TextBlock Classes="slider-value" Text="{Binding Contrast, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Contrast (0-255)"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="Saturation" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding Saturation}" Minimum="0" Maximum="255" Width="140"/>
+                        <TextBlock Classes="slider-value" Text="{Binding Saturation, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Saturation (0-255)"/>
                     </StackPanel>
                     <ToggleButton IsChecked="{Binding ShowAdvancedControls}" Content="More"
                                   ToolTip.Tip="Show additional camera controls (white balance, exposure, focus, …)"
@@ -129,6 +135,8 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowSharpness}">
                         <TextBlock Text="Sharp" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding Sharpness}" Minimum="0" Maximum="255" Width="110"/>
+                        <TextBlock Classes="slider-value" Text="{Binding Sharpness, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Sharpness (0-255)"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWhiteBalance}">
                         <TextBlock Text="WBalance" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
@@ -136,6 +144,9 @@
                         <Slider Value="{Binding WhiteBalanceTemperature}" Minimum="2000" Maximum="7500" Width="130"
                                 IsEnabled="{Binding !WhiteBalanceAuto}"
                                 ToolTip.Tip="White balance temperature (K)"/>
+                        <TextBlock Classes="slider-value" Text="{Binding WhiteBalanceTemperature, StringFormat='{}{0}'}"
+                                   IsEnabled="{Binding !WhiteBalanceAuto}"
+                                   ToolTip.Tip="White balance temperature (K)"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowExposure}">
                         <TextBlock Text="Exposure" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
@@ -143,6 +154,9 @@
                         <Slider Value="{Binding ExposureValue}" Minimum="3" Maximum="2047" Width="130"
                                 IsEnabled="{Binding !ExposureAuto}"
                                 ToolTip.Tip="Exposure time"/>
+                        <TextBlock Classes="slider-value" Text="{Binding ExposureValue, StringFormat='{}{0}'}"
+                                   IsEnabled="{Binding !ExposureAuto}"
+                                   ToolTip.Tip="Exposure time"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowFocus}">
                         <TextBlock Text="Focus" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
@@ -150,14 +164,21 @@
                         <Slider Value="{Binding FocusValue}" Minimum="0" Maximum="255" Width="130"
                                 IsEnabled="{Binding !FocusAuto}"
                                 ToolTip.Tip="Manual focus distance"/>
+                        <TextBlock Classes="slider-value" Text="{Binding FocusValue, StringFormat='{}{0}'}"
+                                   IsEnabled="{Binding !FocusAuto}"
+                                   ToolTip.Tip="Manual focus distance"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowGain}">
                         <TextBlock Text="Gain" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding Gain}" Minimum="0" Maximum="255" Width="110"/>
+                        <TextBlock Classes="slider-value" Text="{Binding Gain, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Gain (0-255)"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowBacklight}">
                         <TextBlock Text="Backlight" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center"/>
                         <Slider Value="{Binding BacklightCompensation}" Minimum="0" Maximum="1" Width="110"/>
+                        <TextBlock Classes="slider-value" Text="{Binding BacklightCompensation, StringFormat='{}{0}'}"
+                                   ToolTip.Tip="Backlight compensation (0 = off, 1 = on)"/>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
