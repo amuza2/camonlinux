@@ -24,9 +24,9 @@
             <ComboBox x:Name="BurstCountBox" Width="130" ToolTip.Tip="Number of burst photos (Unlimited = until stopped)"/>
         </StackPanel>
 
-        <TextBlock Text="Virtual webcam background" FontWeight="SemiBold"/>
+        <TextBlock Text="Background behind the mask" FontWeight="SemiBold"/>
         <ComboBox x:Name="VirtualCamBgBox" Width="140"
-                  ToolTip.Tip="Fills the masked-out (transparent) areas of the virtual webcam — pick Green to chroma-key in Discord/OBS"/>
+                  ToolTip.Tip="Fills the areas a mask cuts out — in the virtual webcam feed and in captured photos. Pick Green to chroma-key in Discord/OBS"/>
 
         <TextBlock Text="Other options (resolution, timer, quality, format, zoom, camera controls, …) are in the main window." 
                    Foreground="#999999" FontSize="12" TextWrapping="Wrap"/>

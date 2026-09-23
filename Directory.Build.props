@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Shared build settings for every project in the repo (app + tests).
+    Kept deliberately small: it turns on the platform analyzers, which are the main
+    source of "you wrote it, but it will bite you later" findings (unobserved tasks,
+    disposed captures, CA rules) that the default `dotnet build` does not report.
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

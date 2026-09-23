@@ -72,6 +72,19 @@ dotnet build
 ./camonlinux/bin/Debug/net10.0/camonlinux
 ```
 
+## Tests
+
+The unit tests cover the pure logic — the masking pipeline, the BGRA pixel helpers,
+GStreamer launch-string escaping, settings persistence and the trash implementation.
+They need no camera, no GStreamer and no display, so they run anywhere:
+
+```bash
+dotnet test
+```
+
+CI (`.github/workflows/build.yml`) runs the build with `-warnaserror`, the test suite
+and a publish, on every push and pull request.
+
 ## Publish a release binary
 
 ```bash
@@ -97,12 +110,16 @@ cp packaging/camonlinux.svg ~/.local/share/icons/hicolor/scalable/apps/camonlinu
 ```
 camonlinux/
 ├── Models/                # CameraDevice, MediaItem, AppSettings
-├── Services/              # Settings, MediaLibrary (watcher), Trash, Notifications
-├── Capture/               # ICaptureService + GStreamerCaptureService, CameraFrame
+├── Services/              # Settings, MediaLibrary (watcher), Trash, Notifications, VirtualCamera
+├── Capture/               # ICaptureService + GStreamerCaptureService, CameraFrame, IFrameProcessor
 ├── Controls/              # VideoSurface (WriteableBitmap renderer)
-├── ViewModels/            # MainWindowViewModel (CommunityToolkit MVVM)
-├── Views/                 # MainWindow.axaml (FluentAvalonia UI)
+├── Imaging/               # PixelBuffer (SIMD helpers for BGRA32 buffers)
+├── Masking/               # MaskPipeline + MaskFrameProcessor, Effects/, Geometry/, Svg/
+├── ViewModels/            # MainWindowViewModel (CommunityToolkit MVVM), MaskEditorViewModel
+├── Views/                 # MainWindow.axaml (FluentAvalonia UI) + dialogs
 └── Assets/                # app icon
+
+camonlinux.Tests/          # xUnit tests for the pure logic (no camera/GStreamer needed)
 ```
 
 ## How the capture pipeline works

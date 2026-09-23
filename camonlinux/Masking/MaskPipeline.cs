@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
-using System.Runtime.CompilerServices;
+using camonlinux.Imaging;
 
 namespace camonlinux.Masking;
 
@@ -40,7 +39,7 @@ public sealed class MaskPipeline
         var count = frame.PixelCount;
         EnsureScratch(count);
 
-        FillAlpha(frame.Data, count, 255);
+        PixelBuffer.SetAlpha(frame.Data, count * PixelBuffer.BytesPerPixel, 255);
 
         // Mask producers first (they write coverage that is ANDed into alpha).
         foreach (var effect in Effects)
@@ -59,7 +58,7 @@ public sealed class MaskPipeline
         }
 
         if (Invert)
-            InvertAlpha(frame.Data, count);
+            PixelBuffer.InvertAlpha(frame.Data, count * PixelBuffer.BytesPerPixel);
 
         if (Mode == MaskMode.Adjustment)
         {
@@ -69,7 +68,7 @@ public sealed class MaskPipeline
                 if (effect.Enabled && effect is IColorAdjustmentEffect adj)
                     adj.Apply(frame, _coverage);
             }
-            FillAlpha(frame.Data, count, 255);
+            PixelBuffer.SetAlpha(frame.Data, count * PixelBuffer.BytesPerPixel, 255);
         }
     }
 
@@ -81,37 +80,11 @@ public sealed class MaskPipeline
 
     // --- buffer helpers (hot loops: no LINQ, no allocation) ---
     //
-    // FillAlpha / InvertAlpha are SIMD-vectorised with System.Numerics.Vector<byte>:
-    // the frame alpha bytes live at indices 3,7,11,… (stride 4), so a vector of
-    // 16/32 bytes covers 4/8 pixels. Vector.ConditionalSelect keeps the RGB bytes
-    // untouched. AndCoverage stays scalar because it must combine a strided alpha
-    // with a contiguous coverage buffer (not SIMD-friendly); it's already a tight
-    // multiply+divide loop and runs per mask producer.
-
-    private static readonly Vector<byte> s_alphaMask = BuildAlphaMask();
-
-    private static Vector<byte> BuildAlphaMask()
-    {
-        Span<byte> m = stackalloc byte[Vector<byte>.Count];
-        for (var i = 3; i < m.Length; i += 4)
-            m[i] = 0xFF;
-        return new Vector<byte>(m);
-    }
-
-    private static void FillAlpha(byte[] data, int count, byte value)
-    {
-        var fill = new Vector<byte>(value);
-        var byteLen = count * 4;
-        var i = 0;
-        for (; i + Vector<byte>.Count <= byteLen; i += Vector<byte>.Count)
-        {
-            var v = Vector.LoadUnsafe(ref data[i]);
-            var nv = Vector.ConditionalSelect(s_alphaMask, fill, v);
-            nv.CopyTo(data.AsSpan(i));
-        }
-        for (var p = i / 4; p < count; p++)
-            data[p * 4 + 3] = value;
-    }
+    // The alpha fill/invert passes are SIMD-vectorised in PixelBuffer (shared with the
+    // capture service and the thumbnail renderer). AndCoverage stays scalar because it
+    // must combine a strided alpha with a contiguous coverage buffer, which doesn't map
+    // onto a lane mask; it's already a tight multiply+divide loop and runs once per
+    // mask producer.
 
     private static void AndCoverage(byte[] data, int count, byte[] coverage)
     {
@@ -121,21 +94,5 @@ public sealed class MaskPipeline
             var i = p * 4 + 3;
             data[i] = (byte)((data[i] * coverage[p]) / 255);
         }
-    }
-
-    private static void InvertAlpha(byte[] data, int count)
-    {
-        var byteLen = count * 4;
-        var i = 0;
-        for (; i + Vector<byte>.Count <= byteLen; i += Vector<byte>.Count)
-        {
-            var v = Vector.LoadUnsafe(ref data[i]);
-            // 255 - alpha at the alpha byte; keep RGB via ConditionalSelect.
-            var inv = new Vector<byte>(255) - (v & s_alphaMask);
-            var nv = Vector.ConditionalSelect(s_alphaMask, inv, v);
-            nv.CopyTo(data.AsSpan(i));
-        }
-        for (var p = i / 4; p < count; p++)
-            data[p * 4 + 3] = (byte)(255 - data[p * 4 + 3]);
     }
 }

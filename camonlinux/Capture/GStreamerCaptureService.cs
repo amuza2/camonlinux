@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using camonlinux.Imaging;
 using camonlinux.Models;
 using GObject;
 using Gst;
@@ -89,6 +91,9 @@ public sealed class GStreamerCaptureService : ICaptureService
     public event EventHandler<CameraFrame>? FrameReady;
     public event EventHandler<string>? ErrorOccurred;
 
+    /// <inheritdoc />
+    public IFrameProcessor? FrameProcessor { get; set; }
+
     public bool IsPreviewActive => _previewPipeline is not null;
     public bool IsRecording => _recordQueue is not null;
     public bool Mirrored { get; set; } = true;
@@ -134,6 +139,12 @@ public sealed class GStreamerCaptureService : ICaptureService
 
     /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
     public bool ShowTimestamp { get; set; }
+
+    /// <summary>
+    /// Colour that fills the areas a mask cuts out when they are flattened into a photo.
+    /// Mirrors the virtual-webcam background so both show the same picture.
+    /// </summary>
+    public (byte R, byte G, byte B) MaskBackground { get; set; }
 
     /// <summary>v4l2 brightness control (0-255, 128 = default).</summary>
     public int Brightness { get; set; } = 128;
@@ -353,11 +364,12 @@ public sealed class GStreamerCaptureService : ICaptureService
     private string SourcePrefix()
     {
         var mode = CurrentMode();
+        var source = $"v4l2src {GstEscape.Property("device", _currentDevice!.Path)}";
         if (mode is null)
-            return $"v4l2src device={_currentDevice!.Path}";
+            return source;
         return mode.Value.Jpeg
-            ? $"v4l2src device={_currentDevice!.Path} ! {mode.Value.Caps} ! jpegdec"
-            : $"v4l2src device={_currentDevice!.Path} ! {mode.Value.Caps}";
+            ? $"{source} ! {mode.Value.Caps} ! jpegdec"
+            : $"{source} ! {mode.Value.Caps}";
     }
 
     private (string Caps, bool Jpeg, int W, int H)? CurrentMode()
@@ -476,7 +488,9 @@ public sealed class GStreamerCaptureService : ICaptureService
             foreach (var line in output.Split('\n'))
             {
                 var trimmed = line.Trim();
-                if (trimmed.Length == 0 || trimmed.StartsWith("User Controls") || trimmed.StartsWith("Camera Controls"))
+                if (trimmed.Length == 0
+                    || trimmed.StartsWith("User Controls", StringComparison.Ordinal)
+                    || trimmed.StartsWith("Camera Controls", StringComparison.Ordinal))
                     continue;
                 var name = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(name))
@@ -626,12 +640,20 @@ public sealed class GStreamerCaptureService : ICaptureService
         if (trimmed.StartsWith("videobalance", StringComparison.Ordinal))
         {
             _liveEffectProperty = "saturation";
-            return "videobalance name=effectbalance" + trimmed.Substring("videobalance".Length);
+            return string.Concat("videobalance name=effectbalance", trimmed.AsSpan("videobalance".Length));
         }
 
         _liveEffectProperty = "";
         return trimmed;
     }
+
+    /// <summary>
+    /// The wall-clock timestamp burned into recordings and photos. Always invariant:
+    /// under a non-Gregorian calendar (e.g. th-TH) the default culture would print a
+    /// different year than the one used in the captured file name.
+    /// </summary>
+    private static string Timestamp()
+        => System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
     private string PreviewDescription(string effect)
     {
@@ -651,10 +673,12 @@ public sealed class GStreamerCaptureService : ICaptureService
         var mirror = Mirrored ? "videoflip video-direction=horiz ! " : "";
         var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $"{EffectStage(effect)} ! ";
         var overlay = ShowTimestamp
-            ? $"textoverlay text=\"{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}\" valignment=bottom halignment=right font-desc=\"Sans 24\" ! "
+            ? $"textoverlay text=\"{Timestamp()}\" valignment=bottom halignment=right font-desc=\"Sans 24\" ! "
             : "";
         // Audio branch: selected (or default) mic -> optional live mute -> AAC, muxed into the MKV.
-        var audioSource = string.IsNullOrEmpty(AudioDevice) ? _audioSource : $"pulsesrc device=\"{AudioDevice}\"";
+        var audioSource = string.IsNullOrEmpty(AudioDevice)
+            ? _audioSource
+            : $"pulsesrc {GstEscape.Property("device", AudioDevice)}";
         var audio = includeAudio && _audioSource is not null
             ? $" {audioSource} ! volume name=micvolume mute={(_micMuted ? "true" : "false")} ! audioconvert " +
               "! audioresample ! audio/x-raw,rate=48000,channels=2 ! fdkaacenc bitrate=128000 " +
@@ -666,7 +690,7 @@ public sealed class GStreamerCaptureService : ICaptureService
             $"{SourcePrefix()} ! videoconvert ! {ZoomStage()}{rotation}{mirror}{effectChain}{overlay}tee name=t " +
             "t. ! queue ! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true " +
             $"t. ! queue name=recq ! videoconvert ! x264enc speed-preset=veryfast tune=zerolatency bitrate={bitrate} " +
-            $"! matroskamux name=mux ! filesink name=filesink location=\"{path}\"{audio}";
+            $"! matroskamux name=mux ! filesink name=filesink {GstEscape.Property("location", path)}{audio}";
     }
 
     private bool TryBuildPipeline(string description)
@@ -737,9 +761,19 @@ public sealed class GStreamerCaptureService : ICaptureService
                 ?? throw new InvalidOperationException("No camera frame available yet.");
         }
 
+        // The frame may carry a mask in its alpha channel. A photo is a plain picture,
+        // like any other webcam app produces, so the cut-out areas are flattened over
+        // the background colour instead of being left transparent (or — worse — leaking
+        // the camera image the mask was meant to hide). With masking off every pixel is
+        // already opaque, so this is a straight copy.
+        var pixels = new byte[frame.Data.Length];
+        var (backgroundR, backgroundG, backgroundB) = MaskBackground;
+        PixelBuffer.FlattenOverBackground(
+            frame.Data, pixels, frame.Data.Length, backgroundR, backgroundG, backgroundB);
+
         var info = new SKImageInfo(frame.Width, frame.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         using var bitmap = new SKBitmap(info);
-        Marshal.Copy(frame.Data, 0, bitmap.GetPixels(), frame.Data.Length);
+        Marshal.Copy(pixels, 0, bitmap.GetPixels(), pixels.Length);
 
         if (ShowTimestamp)
         {
@@ -747,7 +781,7 @@ public sealed class GStreamerCaptureService : ICaptureService
             var fontSize = Math.Max(16f, frame.Height / 24f);
             using var typeface = SKTypeface.FromFamilyName("monospace");
             using var font = new SKFont(typeface, fontSize) { Embolden = true };
-            var text = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var text = Timestamp();
             var x = frame.Width - 8 - font.MeasureText(text);
             var y = frame.Height - 8;
             using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
@@ -780,7 +814,7 @@ public sealed class GStreamerCaptureService : ICaptureService
             // decodebin would decode the entire (possibly huge) video.
             var effectChain = string.IsNullOrWhiteSpace(effect) ? "" : $" ! {effect}";
             var description =
-                $"filesrc location=\"{sampleImagePath}\" ! decodebin ! videoconvert{effectChain} " +
+                $"filesrc {GstEscape.Property("location", sampleImagePath)} ! decodebin ! videoconvert{effectChain} " +
                 $"! videoconvert ! videoscale ! video/x-raw,width={width},height={height} " +
                 "! videoconvert ! video/x-raw,format=BGRx ! appsink name=sink max-buffers=1 drop=true";
 
@@ -828,8 +862,7 @@ public sealed class GStreamerCaptureService : ICaptureService
                 return Task.FromResult<string?>(null);
 
             // BGRx has an unused alpha byte; force it opaque, then encode a PNG.
-            for (var i = 3; i < data.Length; i += 4)
-                data[i] = 0xFF;
+            PixelBuffer.SetOpaque(data);
 
             var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
             using var bitmap = new SKBitmap(info);
@@ -1077,16 +1110,23 @@ public sealed class GStreamerCaptureService : ICaptureService
 
         // GStreamer BGRx has an unused alpha byte; force it opaque so the
         // bitmap renders correctly (and so SkiaSharp can treat it as opaque).
-        for (var i = 3; i < size; i += 4)
-            data[i] = 0xFF;
-
-        var frame = new CameraFrame(data, width, height);
-        lock (_frameLock)
-            _latestFrame = frame;
+        PixelBuffer.SetAlpha(data, size, 0xFF);
 
         // Track the source resolution so a deferred zoom can be applied once it's known.
         _sourceWidth = width;
         _sourceHeight = height;
+
+        var frame = new CameraFrame(data, width, height);
+
+        // Run the processing stage (masking) BEFORE caching/publishing, so the frame
+        // that photo capture and the virtual webcam pick up is always processed.
+        // A processor returning false drops the frame entirely (see IFrameProcessor).
+        if (FrameProcessor is { } processor && !processor.Process(frame))
+            return;
+
+        lock (_frameLock)
+            _latestFrame = frame;
+
         MaybeApplyPendingZoom();
 
         FrameReady?.Invoke(this, frame);

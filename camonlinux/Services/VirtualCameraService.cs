@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using Avalonia.Threading;
+using camonlinux.Capture;
+using camonlinux.Imaging;
+using camonlinux.Models;
 using GObject;
 using Gst;
 using GstApp;
@@ -30,29 +33,15 @@ public sealed class VirtualCameraService : IDisposable
     private byte[]? _compositeScratch;
 
     /// <summary>
-    /// Background colour (0..255) used to fill masked-out (transparent) areas of the
-    /// virtual feed — like OBS's virtual camera, so the shape/adjust mask is actually
-    /// visible to consumer apps (Discord). Default black; green is handy for Discord's
-    /// background replacement.
+    /// Background colour used to fill masked-out (transparent) areas — like OBS's
+    /// virtual camera, so the shape/adjust mask is actually visible to consumer apps
+    /// (Discord). Default black; green is handy for Discord's background replacement.
+    /// The same colour is used when masking is flattened into a photo.
     /// </summary>
-    public (byte R, byte G, byte B) Background { get; set; } = (0, 0, 0);
+    public (byte R, byte G, byte B) Background { get; set; } = BackgroundColor.Black;
 
     /// <summary>Sets <see cref="Background"/> from a name: "Black", "Green" or "White".</summary>
-    public void SetBackground(string? name)
-    {
-        switch (name?.Trim().ToLowerInvariant())
-        {
-            case "green":
-                Background = (0, 255, 0);
-                break;
-            case "white":
-                Background = (255, 255, 255);
-                break;
-            default:
-                Background = (0, 0, 0);
-                break;
-        }
-    }
+    public void SetBackground(string? name) => Background = BackgroundColor.Parse(name);
 
     public bool IsRunning
     {
@@ -86,7 +75,7 @@ public sealed class VirtualCameraService : IDisposable
                 if (File.Exists(driverLink))
                 {
                     var target = new FileInfo(driverLink).LinkTarget ?? string.Empty;
-                    if (target.IndexOf("v4l2loopback", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (target.Contains("v4l2loopback", StringComparison.OrdinalIgnoreCase))
                         return "/dev/" + name;
                 }
 
@@ -95,9 +84,9 @@ public sealed class VirtualCameraService : IDisposable
                 if (File.Exists(nameFile))
                 {
                     var cardName = File.ReadAllText(nameFile);
-                    if (cardName.IndexOf("camonlinux", StringComparison.OrdinalIgnoreCase) >= 0
-                        || cardName.IndexOf("v4l2loopback", StringComparison.OrdinalIgnoreCase) >= 0
-                        || cardName.IndexOf("dummy video device", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (cardName.Contains("camonlinux", StringComparison.OrdinalIgnoreCase)
+                        || cardName.Contains("v4l2loopback", StringComparison.OrdinalIgnoreCase)
+                        || cardName.Contains("dummy video device", StringComparison.OrdinalIgnoreCase))
                         return "/dev/" + name;
                 }
             }
@@ -131,7 +120,7 @@ public sealed class VirtualCameraService : IDisposable
                     $"! video/x-raw,format=BGRx,width={_width},height={_height},framerate={framerate}/1 " +
                     $"! videoconvert ! videoscale " +
                     $"! video/x-raw,format=YUY2 " +
-                    $"! v4l2sink device={_device} sync=false";
+                    $"! v4l2sink {GstEscape.Property("device", _device)} sync=false";
                 _pipeline = (Pipeline)Gst.Functions.ParseLaunch(description);
                 if (_pipeline is null)
                 {
@@ -250,29 +239,9 @@ public sealed class VirtualCameraService : IDisposable
         if (_compositeScratch is null || _compositeScratch.Length != data.Length)
             _compositeScratch = new byte[data.Length];
 
-        var (br, bg, bb) = Background;
-        var dst = _compositeScratch;
-        var count = data.Length / 4;
-        for (var p = 0; p < count; p++)
-        {
-            var o = p * 4;
-            var a = data[o + 3];
-            if (a == 255)
-            {
-                dst[o] = data[o];
-                dst[o + 1] = data[o + 1];
-                dst[o + 2] = data[o + 2];
-            }
-            else
-            {
-                var ia = 255 - a;
-                dst[o] = (byte)((data[o] * a + bb * ia) / 255);
-                dst[o + 1] = (byte)((data[o + 1] * a + bg * ia) / 255);
-                dst[o + 2] = (byte)((data[o + 2] * a + br * ia) / 255);
-            }
-            dst[o + 3] = 255;
-        }
-        return dst;
+        var (r, g, b) = Background;
+        PixelBuffer.FlattenOverBackground(data, _compositeScratch, data.Length, r, g, b);
+        return _compositeScratch;
     }
 
     /// <summary>Stops the pipeline and releases the loopback device.</summary>

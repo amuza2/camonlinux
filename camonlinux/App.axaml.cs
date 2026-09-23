@@ -52,6 +52,8 @@ public partial class App : Application
 
             desktop.Exit += async (_, _) =>
             {
+                // Flush any debounced settings write before the process goes away.
+                settings.Dispose();
                 virtualCamera.Dispose();
                 await capture.StopPreviewAsync();
                 await capture.DisposeAsync();

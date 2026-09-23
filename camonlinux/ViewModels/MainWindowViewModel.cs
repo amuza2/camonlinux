@@ -256,7 +256,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _burstIntervalSeconds = settings.Settings.BurstIntervalSeconds;
         _burstCount = settings.Settings.BurstPhotoCount;
         _selectedBurstInterval = MapBurstIntervalLabel(_burstIntervalSeconds);
-        _selectedBurstCount = _burstCount == 0 ? "Unlimited" : _burstCount.ToString();
+        _selectedBurstCount = _burstCount == 0 ? "Unlimited" : _burstCount.ToString(CultureInfo.InvariantCulture);
         _isVideoMode = settings.Settings.IsVideoMode;
         _virtualCamBackground = string.IsNullOrEmpty(settings.Settings.VirtualCamBackground)
             ? "Black"
@@ -298,6 +298,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _capture.Resolution = settings.Settings.Resolution;
         _capture.RecordQuality = settings.Settings.RecordQuality;
         _capture.MaxFileSizeMB = settings.Settings.MaxFileSizeMB;
+        // One background setting, shared with the virtual webcam: it fills the areas a
+        // mask cuts out, both in the webcam feed and in captured photos.
+        _capture.MaskBackground = BackgroundColor.Parse(_virtualCamBackground);
 
         // Effects are loaded in InitializeAsync (after GStreamer is initialized) —
         // ElementFactory.Find returns nothing before gst_init, so frei0r effects
@@ -697,6 +700,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _settings.Settings.VirtualCamBackground = value;
         _settings.Save();
+        _capture.MaskBackground = BackgroundColor.Parse(value);
     }
 
     private static string MapBurstIntervalLabel(double seconds) => seconds switch
@@ -745,7 +749,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var zoom = value switch { "1.5×" => 1.5, "2×" => 2.0, "3×" => 3.0, "4×" => 4.0, _ => 1.0 };
         _settings.Settings.Zoom = zoom;
-        _settings.Save();
+        // The mouse wheel can change this many times per second — coalesce the writes.
+        _settings.QueueSave();
         _capture.Zoom = zoom;
         // Zoom is baked into the pipeline, so restart the preview.
         if (IsPreviewActive && SelectedDevice is not null)
@@ -813,7 +818,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _settings.Settings.ExposureValue = ExposureValue;
         _settings.Settings.FocusAuto = FocusAuto;
         _settings.Settings.FocusValue = FocusValue;
-        _settings.Save();
+        // Dragging a slider fires this on every tick — coalesce the disk writes.
+        _settings.QueueSave();
 
         _capture.Brightness = Brightness;
         _capture.Contrast = Contrast;
@@ -912,7 +918,8 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
 
         _settings.Settings.EffectIntensities[effect.Id] = value;
-        _settings.Save();
+        // The intensity slider drags continuously — coalesce the disk writes.
+        _settings.QueueSave();
 
         _capture.Effect = BuildEffectFilter(effect, value);
         // videobalance-based effects are adjustable live — push the new value to the
@@ -1131,7 +1138,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateCountdownText()
     {
-        CountdownText = _countdownRemaining.ToString();
+        CountdownText = _countdownRemaining.ToString(CultureInfo.InvariantCulture);
         StatusMessage = $"Taking photo in {_countdownRemaining}…";
     }
 
@@ -1154,6 +1161,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task CapturePhotoAsync()
     {
         var path = NextPhotoPath(_settings.Settings.PhotoDirectory);
+        var name = Path.GetFileName(path);
 
         // White flash as visual confirmation of the capture.
         IsFlashing = true;
@@ -1161,9 +1169,16 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             await _capture.TakePhotoAsync(path);
             ShutterSound.Play(); // camera-like shutter click (Kamoso-style)
-            StatusMessage = $"Photo saved to {Path.GetFileName(path)}";
-            ShowToast($"Photo saved to {Path.GetFileName(path)}");
-            NotificationService.Notify("Photo taken", Path.GetFileName(path));
+            StatusMessage = $"Photo saved to {name}";
+
+            // Burst mode fires every 1-5 s — a toast plus a desktop notification per
+            // frame would bury the user in popups. The status line still updates.
+            if (!IsBurstActive)
+            {
+                ShowToast($"Photo saved to {name}");
+                NotificationService.Notify("Photo taken", name);
+            }
+
             RefreshGallery();
         }
         catch (Exception ex)
@@ -1183,7 +1198,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         Directory.CreateDirectory(directory);
         var ext = _photoFormat == "png" ? "png" : "jpg";
-        var stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        // Invariant culture: under a non-Gregorian calendar (e.g. th-TH) the default
+        // formatting would produce a different year in the file name.
+        var stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
         var path = Path.Combine(directory, $"picture_{stamp}.{ext}");
         var index = 1;
         while (File.Exists(path))
@@ -1249,7 +1266,8 @@ public partial class MainWindowViewModel : ViewModelBase
             CancelPhotoCountdown();
             var directory = _settings.Settings.VideoDirectory;
             Directory.CreateDirectory(directory);
-            var path = Path.Combine(directory, $"video_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.mkv");
+            var stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
+            var path = Path.Combine(directory, $"video_{stamp}.mkv");
 
             try
             {
@@ -1260,7 +1278,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 _recordingTimer = new Timer(
                     _ => Dispatcher.UIThread.Post(() =>
                     {
-                        RecordingTime = _recordingStopwatch.Elapsed.ToString(@"mm\:ss");
+                        RecordingTime = _recordingStopwatch.Elapsed.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
                         RecordingSize = FormatFileSize(_recordingPath);
                     }),
                     null,
@@ -1411,8 +1429,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static string ThumbCachePath(string filePath)
     {
+        // SHA-256 (not SHA-1): the hash is only a cache key, but a weak algorithm is
+        // flagged by the analyzers and there is no reason to keep it.
         var hash = Convert.ToHexString(
-            System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)));
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)));
         return Path.Combine(Path.GetTempPath(), "camonlinux_gallery", hash + ".png");
     }
 

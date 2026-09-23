@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore camonlinux.sln
+
+      # -warnaserror keeps the analyzer baseline clean: a new warning fails the build
+      # instead of quietly accumulating.
+      - name: Build
+        run: dotnet build camonlinux.sln -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test camonlinux.sln -c Release --no-build --logger "console;verbosity=normal"
+
+      # The app must still publish; a broken publish path (missing resource, bad
+      # runtime identifier) is only visible at this step.
+      - name: Publish (framework-dependent)
+        run: dotnet publish camonlinux/camonlinux.csproj -c Release -r linux-x64 --self-contained false -o publish

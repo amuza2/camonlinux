@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 
 namespace camonlinux.Services;
@@ -57,7 +58,7 @@ public static class TrashService
             File.Move(path, destination);
 
         var uri = new Uri(path).AbsoluteUri;
-        var date = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+        var date = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
         var trashInfoPath = Path.Combine(infoDir, Path.GetFileName(destination) + ".trashinfo");
         File.WriteAllText(trashInfoPath, $"[Trash Info]\nPath={uri}\nDeletionDate={date}\n");
         return true;

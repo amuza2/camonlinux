@@ -20,8 +20,6 @@ public partial class MainWindow : Window
     private VirtualCameraService? _virtualCamera;
     private int _lastFrameW;
     private int _lastFrameH;
-    private int _maskFrames;
-    private readonly MaskFrame _maskFrame = new();
 
     public MainWindow()
     {
@@ -30,17 +28,16 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Wires the capture service's frames to the preview surface and, optionally, to
-    /// the virtual webcam. When a mask pipeline is provided, it is applied in place
-    /// (BGRA32) on the streaming thread before the frame is pushed, so the virtual
-    /// webcam shows the masked/adjusted feed too.
+    /// the virtual webcam. When a mask pipeline is provided it is registered as the
+    /// capture service's <see cref="IFrameProcessor"/>, i.e. it runs on the streaming
+    /// thread <b>before</b> each frame is cached — so the preview, photos and the
+    /// virtual webcam all see the same masked/adjusted frame.
     /// </summary>
     public void ConnectCapture(ICaptureService capture, MaskPipeline? maskPipeline, VirtualCameraService? virtualCamera = null)
     {
         _maskPipeline = maskPipeline;
         _virtualCamera = virtualCamera;
 
-        // Composite the mask alpha in software while masking is enabled; fall back to
-        // the fast copy path otherwise.
         if (DataContext is MainWindowViewModel vm)
         {
             VideoSurfaceControl.CompositeAlpha = vm.IsMaskEnabled;
@@ -56,24 +53,18 @@ public partial class MainWindow : Window
             vm.MaskEditor.Shape.PropertyChanged += (_, _) => UpdateMaskHandlePosition();
         }
 
+        // The mask stage lives in the capture path (not here) so the latest-frame
+        // cache can never hold an unprocessed frame.
+        capture.FrameProcessor = maskPipeline is null ? null : new MaskFrameProcessor(maskPipeline);
+
         capture.FrameReady += (_, frame) =>
         {
-            // If the UI thread is behind on preview updates, skip the expensive mask
-            // work and drop this frame — prevents CPU spikes and unbounded memory.
+            // If the UI thread is behind on preview updates, drop this frame — the
+            // frame was already processed and cached, so nothing is lost by skipping
+            // the render (prevents CPU spikes and unbounded memory).
             if (VideoSurfaceControl.IsUiBackedUp)
                 return;
 
-            // The mask math is the expensive part (per-pixel over the whole frame).
-            // Cap the processed rate to ~15 fps while masking so CPU stays bounded;
-            // a live preview doesn't need the full capture rate.
-            if (_maskPipeline is { Enabled: true } && (++_maskFrames & 1) != 0)
-                return;
-
-            if (_maskPipeline is { Enabled: true } && frame.Data.Length > 0)
-            {
-                _maskFrame.Set(frame.Data, frame.Width, frame.Height);
-                _maskPipeline.Apply(_maskFrame);
-            }
             _lastFrameW = frame.Width;
             _lastFrameH = frame.Height;
             VideoSurfaceControl.PushFrame(frame);

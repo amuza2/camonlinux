@@ -18,6 +18,13 @@ public interface ICaptureService : IAsyncDisposable
     /// <summary>Raised when the capture backend encounters a recoverable error.</summary>
     event EventHandler<string>? ErrorOccurred;
 
+    /// <summary>
+    /// Optional in-place processing stage (e.g. the mask pipeline) run on the
+    /// streaming thread for every frame <b>before</b> it is cached as the latest
+    /// frame and published via <see cref="FrameReady"/>. Set it once during startup.
+    /// </summary>
+    IFrameProcessor? FrameProcessor { get; set; }
+
     bool IsPreviewActive { get; }
     bool IsRecording { get; }
     bool Mirrored { get; set; }
@@ -45,6 +52,12 @@ public interface ICaptureService : IAsyncDisposable
 
     /// <summary>Stamp photos and recordings with the date &amp; time.</summary>
     bool ShowTimestamp { get; set; }
+
+    /// <summary>
+    /// Colour that fills the areas a mask cuts out when they are flattened into a photo.
+    /// Mirrors the virtual-webcam background so a photo looks like what other apps see.
+    /// </summary>
+    (byte R, byte G, byte B) MaskBackground { get; set; }
 
     /// <summary>v4l2 brightness control (0-255, 128 = default).</summary>
     int Brightness { get; set; }

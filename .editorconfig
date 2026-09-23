@@ -1,0 +1,52 @@
+# Editor + analyzer configuration for the camonlinux repo.
+#
+# A pattern without a slash (like the [*.cs] section below) matches files in every
+# directory, so this single section covers both the app and the test project.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+
+# --------------------------------------------------------------------------- #
+# Analyzer baseline
+#
+# Directory.Build.props enables the .NET analyzers at `latest-recommended`, which is
+# stricter than the SDK default. Every finding was triaged: the ones that indicated
+# real problems were fixed (culture-invariant date/number formatting, a weak SHA-1
+# cache key, `IndexOf` misuse). The rules below are the remaining findings, which are
+# either deliberate design choices or cosmetic. They are downgraded to `suggestion`
+# so they stay visible in the IDE without failing the CI build, which runs with
+# -warnaserror.
+# --------------------------------------------------------------------------- #
+
+# Public fields on MaskPipeline are read on the capture streaming thread; property
+# accessors would add indirection to a per-frame hot path for no benefit.
+dotnet_diagnostic.CA1051.severity = suggestion
+
+# "Member can be static" — the media/pipeline helpers are instance members so they can
+# grow dependencies (a device enumerator, a logger) without changing every call site.
+dotnet_diagnostic.CA1822.severity = suggestion
+
+# MainWindowViewModel / VideoSurface own a WriteableBitmap and short-lived Timers. The
+# timers are disposed when replaced, and the view model lives exactly as long as the
+# app, so implementing a full IDisposable graph would add ceremony without benefit.
+dotnet_diagnostic.CA1001.severity = suggestion
+
+# `= false` on an effect's Enabled flag is documentation of the default.
+dotnet_diagnostic.CA1805.severity = suggestion
+
+# Constant array arguments in the SVG rasterizer run once per rendered mask, not in a
+# tight loop.
+dotnet_diagnostic.CA1861.severity = suggestion
+
+# `FirstOrDefault()` on an IReadOnlyList in the device hot-plug path: the collection is
+# tiny (a handful of cameras) and the LINQ form reads better.
+dotnet_diagnostic.CA1826.severity = suggestion
